@@ -1,0 +1,141 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint:js -- --max-warnings 100
+
+      - name: Run Solhint
+        run: npm run lint:sol
+
+  react-ui:
+    name: React UI Tests
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run React UI tests
+        run: npm run test:ui
+
+      - name: Run React UI tests with coverage
+        run: npm run test:ui:coverage
+        continue-on-error: true
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        if: success()
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+  smart-contracts:
+    name: Smart Contract Tests
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update && apt-get install -y python3 make g++ openssl
+          
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Generate test encryption keys
+        run: |
+          mkdir -p tmp
+          openssl genrsa 2048 > tmp/test_private.key
+          openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
+
+      - name: Start Ganache and run tests
+        run: |
+          # Start Ganache in background with sufficient accounts for stress tests
+          npx ganache --wallet.totalAccounts 300 --wallet.defaultBalance 1000 --chain.hardfork istanbul &
+          GANACHE_PID=$!
+          
+          # Wait for Ganache to start
+          echo "Waiting for Ganache to start..."
+          sleep 10
+          
+          # Verify Ganache is running
+          curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://127.0.0.1:8545 || (echo "Ganache failed to start" && exit 1)
+          
+          # Run smart contract tests
+          npm test
+          
+          # Cleanup
+          kill $GANACHE_PID || true
+
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    container:
+      image: node:22-bookworm
+    needs: [lint, react-ui]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+  # Docker build verification - ensures Dockerfile stays valid
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: blockparty:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          docker run --rm blockparty:test npm run test:ui

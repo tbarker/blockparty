@@ -1,41 +1,34 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
-import TextField from 'material-ui/TextField';
-
-const styles = {
-  paperRight:{
-    flex: 3,
-    textAlign: 'center',
-  }
-};
+import TextField from '@mui/material/TextField';
 
 class NameSearch extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      keyword: null
+      keyword: ''
     };
   }
 
   componentDidMount(){
     this.props.eventEmitter.on('search', keyword => {
-      this.setState({ keyword: keyword });
+      this.setState({ keyword: keyword || '' });
     });
   }
 
   handleSearchField(event){
-    this.props.eventEmitter.emit('search', event.target.value)
+    this.props.eventEmitter.emit('search', event.target.value);
   }
 
   render() {
     return (
-        <TextField
-        floatingLabelText="Search by name or address"
-        floatingLabelFixed={true}
+      <TextField
+        label="Search by name or address"
         value={this.state.keyword}
         onChange={this.handleSearchField.bind(this)}
-        style={{margin:'0 5px'}}
-        />
+        variant="outlined"
+        size="small"
+        sx={{ margin: '0 5px' }}
+      />
     );
   }
 }

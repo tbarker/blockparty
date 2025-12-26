@@ -14,4 +14,4 @@ module.exports = function(callback) {
   console.log('Sending ', arg.v, ' ether from ', sender, ' to ', receiver);
   web3.eth.sendTransaction({from:sender, to:receiver, value:value, gas:100000});
   console.log('balance', balance.toNumber());
-}
+};

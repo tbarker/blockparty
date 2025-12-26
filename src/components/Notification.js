@@ -21,7 +21,7 @@ class Notification extends React.Component {
   }
 
   render(){
-    return (<div><NotificationContainer/></div>)
+    return (<div><NotificationContainer/></div>);
   }
 }
 

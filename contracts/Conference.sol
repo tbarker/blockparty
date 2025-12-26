@@ -1,9 +1,10 @@
-pragma solidity 0.4.24;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
 
-import './GroupAdmin.sol';
-import './zeppelin/lifecycle/Destructible.sol';
+import "./GroupAdmin.sol";
+import "./zeppelin/lifecycle/Destructible.sol";
 
-contract Conference is Destructible, GroupAdmin {    
+contract Conference is Destructible, GroupAdmin {
     string public name;
     uint256 public deposit;
     uint public limitOfParticipants;
@@ -16,8 +17,8 @@ contract Conference is Destructible, GroupAdmin {
     uint256 public payoutAmount;
     string public encryption;
 
-    mapping (address => Participant) public participants;
-    mapping (uint => address) public participantsIndex;
+    mapping(address => Participant) public participants;
+    mapping(uint => address) public participantsIndex;
 
     struct Participant {
         string participantName;
@@ -34,52 +35,52 @@ contract Conference is Destructible, GroupAdmin {
     event ClearEvent(address addr, uint256 leftOver);
 
     /* Modifiers */
-    modifier onlyActive {
-        require(!ended);
+    modifier onlyActive() {
+        require(!ended, "Conference: event has ended");
         _;
     }
 
-    modifier noOneRegistered {
-        require(registered == 0);
+    modifier noOneRegistered() {
+        require(registered == 0, "Conference: participants already registered");
         _;
     }
 
-    modifier onlyEnded {
-        require(ended);
+    modifier onlyEnded() {
+        require(ended, "Conference: event has not ended");
         _;
     }
 
     /* Public functions */
     /**
-     * @dev Construcotr.
+     * @dev Constructor.
      * @param _name The name of the event
      * @param _deposit The amount each participant deposits. The default is set to 0.02 Ether. The amount cannot be changed once deployed.
      * @param _limitOfParticipants The number of participant. The default is set to 20. The number can be changed by the owner of the event.
-     * @param _coolingPeriod The period participants should withdraw their deposit after the event ends. After the cooling period, the event owner can claim the remining deposits.
-     * @param _encryption A pubic key. The admin can use this public key to encrypt pariticipant username which is stored in event. The admin can later decrypt the name using his/her private key.
+     * @param _coolingPeriod The period participants should withdraw their deposit after the event ends. After the cooling period, the event owner can claim the remaining deposits.
+     * @param _encryption A public key. The admin can use this public key to encrypt participant username which is stored in event. The admin can later decrypt the name using his/her private key.
      */
-    constructor (
-        string _name,
+    constructor(
+        string memory _name,
         uint256 _deposit,
         uint _limitOfParticipants,
         uint _coolingPeriod,
-        string _encryption
-    ) public {
-        if (bytes(_name).length != 0){
+        string memory _encryption
+    ) {
+        if (bytes(_name).length != 0) {
             name = _name;
         } else {
-            name = 'Test';
+            name = "Test";
         }
 
-        if(_deposit != 0){
+        if (_deposit != 0) {
             deposit = _deposit;
-        }else{
+        } else {
             deposit = 0.02 ether;
         }
 
-        if (_limitOfParticipants != 0){
+        if (_limitOfParticipants != 0) {
             limitOfParticipants = _limitOfParticipants;
-        }else{
+        } else {
             limitOfParticipants = 20;
         }
 
@@ -99,7 +100,7 @@ contract Conference is Destructible, GroupAdmin {
      * @param _participant The twitter address of the participant
      * @param _encrypted The encrypted participant name
      */
-    function registerWithEncryption(string _participant, string _encrypted) external payable onlyActive{
+    function registerWithEncryption(string calldata _participant, string calldata _encrypted) external payable onlyActive {
         registerInternal(_participant);
         emit RegisterEvent(msg.sender, _participant, _encrypted);
     }
@@ -108,19 +109,19 @@ contract Conference is Destructible, GroupAdmin {
      * @dev Registers with twitter name.
      * @param _participant The twitter address of the participant
      */
-    function register(string _participant) external payable onlyActive{
+    function register(string calldata _participant) external payable onlyActive {
         registerInternal(_participant);
-        emit RegisterEvent(msg.sender, _participant, '');
+        emit RegisterEvent(msg.sender, _participant, "");
     }
 
     /**
      * @dev The internal function to register participant
      * @param _participant The twitter address of the participant
      */
-    function registerInternal(string _participant) internal {
-        require(msg.value == deposit);
-        require(registered < limitOfParticipants);
-        require(!isRegistered(msg.sender));
+    function registerInternal(string calldata _participant) internal {
+        require(msg.value == deposit, "Conference: incorrect deposit amount");
+        require(registered < limitOfParticipants, "Conference: participant limit reached");
+        require(!isRegistered(msg.sender), "Conference: already registered");
 
         registered++;
         participantsIndex[registered] = msg.sender;
@@ -130,33 +131,33 @@ contract Conference is Destructible, GroupAdmin {
     /**
      * @dev Withdraws deposit after the event is over.
      */
-    function withdraw() external onlyEnded{
-        require(payoutAmount > 0);
-        Participant participant = participants[msg.sender];
-        require(participant.addr == msg.sender);
-        require(cancelled || participant.attended);
-        require(participant.paid == false);
+    function withdraw() external onlyEnded {
+        require(payoutAmount > 0, "Conference: no payout available");
+        Participant storage participant = participants[msg.sender];
+        require(participant.addr == msg.sender, "Conference: not a participant");
+        require(cancelled || participant.attended, "Conference: did not attend");
+        require(participant.paid == false, "Conference: already paid");
 
         participant.paid = true;
-        participant.addr.transfer(payoutAmount);
+        payable(msg.sender).transfer(payoutAmount);
         emit WithdrawEvent(msg.sender, payoutAmount);
     }
 
     /* Constants */
     /**
-     * @dev Returns total balance of the contract. This function can be deprecated when refactroing front end code.
+     * @dev Returns total balance of the contract. This function can be deprecated when refactoring front end code.
      * @return The total balance of the contract.
      */
-    function totalBalance() view public returns (uint256){
+    function totalBalance() public view returns (uint256) {
         return address(this).balance;
     }
 
     /**
      * @dev Returns true if the given user is registered.
      * @param _addr The address of a participant.
-     * @return True if the address exists in the pariticipant list.
+     * @return True if the address exists in the participant list.
      */
-    function isRegistered(address _addr) view public returns (bool){
+    function isRegistered(address _addr) public view returns (bool) {
         return participants[_addr].addr != address(0);
     }
 
@@ -165,7 +166,7 @@ contract Conference is Destructible, GroupAdmin {
      * @param _addr The address of a participant.
      * @return True if the user is marked as attended by admin.
      */
-    function isAttended(address _addr) view public returns (bool){
+    function isAttended(address _addr) public view returns (bool) {
         return isRegistered(_addr) && participants[_addr].attended;
     }
 
@@ -174,7 +175,7 @@ contract Conference is Destructible, GroupAdmin {
      * @param _addr The address of a participant.
      * @return True if the attendee has withdrawn his/her deposit.
      */
-    function isPaid(address _addr) view public returns (bool){
+    function isPaid(address _addr) public view returns (bool) {
         return isRegistered(_addr) && participants[_addr].paid;
     }
 
@@ -182,9 +183,9 @@ contract Conference is Destructible, GroupAdmin {
      * @dev Show the payout amount each participant can withdraw.
      * @return The amount each participant can withdraw.
      */
-    function payout() view public returns(uint256){
+    function payout() public view returns (uint256) {
         if (attended == 0) return 0;
-        return uint(totalBalance()) / uint(attended);
+        return totalBalance() / attended;
     }
 
     /* Admin only functions */
@@ -192,29 +193,29 @@ contract Conference is Destructible, GroupAdmin {
     /**
      * @dev Ends the event by owner
      */
-    function payback() external onlyOwner onlyActive{
+    function payback() external onlyOwner onlyActive {
         payoutAmount = payout();
         ended = true;
-        endedAt = now;
+        endedAt = block.timestamp;
         emit PaybackEvent(payoutAmount);
     }
 
     /**
      * @dev Cancels the event by owner. When the event is canceled each participant can withdraw their deposit back.
      */
-    function cancel() external onlyOwner onlyActive{
+    function cancel() external onlyOwner onlyActive {
         payoutAmount = deposit;
         cancelled = true;
         ended = true;
-        endedAt = now;
+        endedAt = block.timestamp;
         emit CancelEvent();
     }
 
     /**
-    * @dev The event owner transfer the outstanding deposits  if there are any unclaimed deposits after cooling period
-    */
-    function clear() external onlyOwner onlyEnded{
-        require(now > endedAt + coolingPeriod);
+     * @dev The event owner transfer the outstanding deposits if there are any unclaimed deposits after cooling period
+     */
+    function clear() external onlyOwner onlyEnded {
+        require(block.timestamp > endedAt + coolingPeriod, "Conference: cooling period not passed");
         uint leftOver = totalBalance();
         owner.transfer(leftOver);
         emit ClearEvent(owner, leftOver);
@@ -224,7 +225,7 @@ contract Conference is Destructible, GroupAdmin {
      * @dev Change the capacity of the event. The owner can change it until event is over.
      * @param _limitOfParticipants the number of the capacity of the event.
      */
-    function setLimitOfParticipants(uint _limitOfParticipants) external onlyOwner onlyActive{
+    function setLimitOfParticipants(uint _limitOfParticipants) external onlyOwner onlyActive {
         limitOfParticipants = _limitOfParticipants;
     }
 
@@ -232,7 +233,7 @@ contract Conference is Destructible, GroupAdmin {
      * @dev Change the name of the event. The owner can change it as long as no one has registered yet.
      * @param _name the name of the event.
      */
-    function changeName(string _name) external onlyOwner noOneRegistered{
+    function changeName(string calldata _name) external onlyOwner noOneRegistered {
         name = _name;
     }
 
@@ -240,11 +241,11 @@ contract Conference is Destructible, GroupAdmin {
      * @dev Mark participants as attended. The attendance cannot be undone.
      * @param _addresses The list of participant's address.
      */
-    function attend(address[] _addresses) external onlyAdmin onlyActive{
-        for( uint i = 0; i < _addresses.length; i++){
+    function attend(address[] calldata _addresses) external onlyAdmin onlyActive {
+        for (uint i = 0; i < _addresses.length; i++) {
             address _addr = _addresses[i];
-            require(isRegistered(_addr));
-            require(!isAttended(_addr));
+            require(isRegistered(_addr), "Conference: address not registered");
+            require(!isAttended(_addr), "Conference: already attended");
             emit AttendEvent(_addr);
             participants[_addr].attended = true;
             attended++;

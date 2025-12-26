@@ -1,192 +1,226 @@
 import React from 'react';
-import {List, ListItem} from 'material-ui/List';
-import Divider from 'material-ui/Divider';
-import Paper from 'material-ui/Paper';
-import PeopleOutlineIcon from 'material-ui/svg-icons/social/people-outline';
-import PeopleIcon from 'material-ui/svg-icons/social/people';
-import EventIcon from 'material-ui/svg-icons/action/event';
-import PlaceIcon from 'material-ui/svg-icons/maps/place';
-import DirectionIcon from 'material-ui/svg-icons/maps/directions';
-import IconButton from 'material-ui/IconButton';
-import Avatar from 'material-ui/Avatar';
-import math from 'mathjs';
-import $ from 'jquery';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Divider from '@mui/material/Divider';
+import Paper from '@mui/material/Paper';
+import Avatar from '@mui/material/Avatar';
+import PeopleIcon from '@mui/icons-material/People';
+import EventIcon from '@mui/icons-material/Event';
+import PlaceIcon from '@mui/icons-material/Place';
+import DirectionsIcon from '@mui/icons-material/Directions';
 
-const getEtherIcon = () =>(
-  <Avatar src={require('../images/ethereum.ico')} size={26} backgroundColor="white" />
-)
+const getEtherIcon = () => (
+  <Avatar
+    src={require('../images/ethereum.ico')}
+    sx={{ width: 26, height: 26, bgcolor: 'white' }}
+  />
+);
 
 const styles = {
-  paperLeft:{
+  paperLeft: {
     flex: 2,
     height: '100%',
     textAlign: 'left',
-    padding: 10
+    padding: 10,
   },
-  list:{
-    float:'right', color: 'grey', merginHight:1
+  list: {
+    float: 'right',
+    color: 'grey',
+    marginRight: 1,
   },
-  innerDiv:{
-    paddingTop:1, paddingBottom:1, paddingRight:1
-  }
 };
-
 
 class ConferenceDetail extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      etherscan_url:null
+      etherscan_url: null,
     };
   }
 
-  componentDidMount(){
+  componentDidMount() {
     // Initialize
     this.props.eventEmitter.on('detail', detail => {
       this.setState(detail);
-    })
+    });
 
     this.props.eventEmitter.on('network', network => {
       this.setState({
-        etherscan_url: network.etherscan_url
+        etherscan_url: network.etherscan_url,
       });
-    })
+    });
 
     // If the app failed to get detail from contract (meaning either connecting
     // to wrong network or the contract id does not match to the one deployed),
     // it will show instruction page.
-    setTimeout(function(){
-      if(typeof(this.state.name) == 'undefined'){
-        this.props.eventEmitter.emit('instruction');
-      }
-    }.bind(this), 5000)
-    // Listen to watcher event.
-    this.serverRequest = $.get('https://coinmarketcap-nexuist.rhcloud.com/api/eth', function (result) {
-      this.setState({
-        rate: math.round((result.price.gbp / 20), 2).toString()
-      });
-    }.bind(this));
+    setTimeout(
+      function () {
+        if (typeof this.state.name == 'undefined') {
+          this.props.eventEmitter.emit('instruction');
+        }
+      }.bind(this),
+      5000
+    );
   }
 
-  toEther(value){
-    if(value){
-      // return math.round(this.props.web3.fromWei(value, "ether").toNumber(), 3).toString();
-      return this.props.web3.fromWei(value, "ether").toString();
+  toEther(value) {
+    if (value) {
+      // Web3 v1.x uses web3.utils.fromWei
+      return this.props.web3.utils.fromWei(value.toString(), 'ether');
     }
   }
 
-  toNumber(value){
-    if(value) return value.toNumber();
+  toNumber(value) {
+    if (value) return value.toNumber();
   }
 
-  getNameContent(name, contractAddress){
-    if(name){
-      if (this.state.etherscan_url) {
+  getNameContent(name, contractAddress) {
+    // Handle undefined/null contractAddress
+    const address = contractAddress || '';
+    const shortAddress = address ? `${address.slice(0, 5)}...` : 'Unknown';
+
+    if (name) {
+      if (this.state.etherscan_url && address) {
         return (
           <span style={styles.list}>
-            {name} (<a target='_blank' href={ `${this.state.etherscan_url}/address/${contractAddress}` }>{contractAddress.slice(0,5)}...</a>)
+            {name} (
+            <a
+              target="_blank"
+              href={`${this.state.etherscan_url}/address/${address}`}
+              rel="noreferrer"
+            >
+              {shortAddress}
+            </a>
+            )
           </span>
-        )
-      }else{
+        );
+      } else {
         return (
           <span style={styles.list}>
-            {name} ({contractAddress.slice(0,5)}...)
+            {name} ({shortAddress})
           </span>
-        )
+        );
       }
-    }else{
+    } else {
       return (
         <span style={styles.list}>
-          The contract {contractAddress.slice(0,10)}... not available
+          {address ? `The contract ${address.slice(0, 10)}... not available` : 'Loading...'}
         </span>
-      )
+      );
     }
   }
 
-  getDateContent(name){
-    if(name){
-      var d = new Date();
-      var curr_date = d.getDate();
-      var curr_month = d.getMonth() + 1; //Months are zero based
-      var curr_year = d.getFullYear();
-      var date = `${curr_date}-${curr_month}-${curr_year}`
-
-      return (
-        <span style={styles.list}>{name}</span>
-      )
-    }else{
-      return (
-        <span style={styles.list}>No info available</span>
-      )
+  getDateContent(name) {
+    if (name) {
+      return <span style={styles.list}>{name}</span>;
+    } else {
+      return <span style={styles.list}>No info available</span>;
     }
   }
 
-  getDepositContent(deposit, rate){
-    if(deposit){
-      return (
-        <span style={styles.list}> ETH {this.toEther(deposit)}</span>
-      )
-    }else{
-      return (
-        <span style={styles.list}>No info available</span>
-      )
+  getDepositContent(deposit) {
+    if (deposit) {
+      return <span style={styles.list}> ETH {this.toEther(deposit)}</span>;
+    } else {
+      return <span style={styles.list}>No info available</span>;
     }
   }
 
   render() {
     let attendancyStatus;
     if (this.state.ended) {
-      attendancyStatus = <p>Attended<span style={styles.list}>{this.toNumber(this.state.attended)}</span></p>
-    }else{
-      attendancyStatus = <p>Going (spots left)<span style={styles.list}>{this.toNumber(this.state.registered)}({this.toNumber(this.state.limitOfParticipants) - this.toNumber(this.state.registered)})</span></p>
+      attendancyStatus = (
+        <span>
+          Attended<span style={styles.list}>{this.toNumber(this.state.attended)}</span>
+        </span>
+      );
+    } else {
+      attendancyStatus = (
+        <span>
+          Going (spots left)
+          <span style={styles.list}>
+            {this.toNumber(this.state.registered)}(
+            {this.toNumber(this.state.limitOfParticipants) - this.toNumber(this.state.registered)})
+          </span>
+        </span>
+      );
     }
 
     return (
-      <Paper zDepth={1} style={styles.paperLeft}>
-        <h4 style={{textAlign:'center'}}>Event Info</h4>
+      <Paper elevation={1} style={styles.paperLeft}>
+        <h4 style={{ textAlign: 'center' }}>Event Info</h4>
         <List>
-          <ListItem innerDivStyle={styles.innerDiv} insetChildren={true} disabled={true}
-            primaryText={
-              <p>Name{this.getNameContent(this.state.name, this.props.contractAddress)}</p>
-            }
-          />
-          <ListItem innerDivStyle={styles.innerDiv} leftIcon={<EventIcon />} disabled={true}
-            primaryText={
-              <p>Date{this.getDateContent(this.state.date)}</p>
-            }
-          />
-          <ListItem innerDivStyle={styles.innerDiv} leftIcon={<PlaceIcon />} disabled={true}
-            primaryText={
-              <p>Location
-                <span style={styles.list}>
-                  <a target='_blank' href={this.state.map_url}>{this.state.location_text}</a>
+          <ListItem>
+            <ListItemText
+              primary={
+                <span>Name{this.getNameContent(this.state.name, this.props.contractAddress)}</span>
+              }
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemIcon>
+              <EventIcon />
+            </ListItemIcon>
+            <ListItemText primary={<span>Date{this.getDateContent(this.state.date)}</span>} />
+          </ListItem>
+          <ListItem>
+            <ListItemIcon>
+              <PlaceIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                <span>
+                  Location
+                  <span style={styles.list}>
+                    <a target="_blank" href={this.state.map_url} rel="noreferrer">
+                      {this.state.location_text}
+                    </a>
+                  </span>
                 </span>
-              </p>
-            }
-          />
-          <ListItem innerDivStyle={styles.innerDiv} leftIcon={<DirectionIcon />} disabled={true}
-            primaryText={
-              <p>Description
-                <span style={styles.list}
-                  dangerouslySetInnerHTML={ {__html:this.state.description_text} }
-                />
-              </p>
-            }
-          />
-          <ListItem innerDivStyle={styles.innerDiv} leftIcon={getEtherIcon()} disabled={true}
-            primaryText={
-              <p>Deposit{this.getDepositContent(this.state.deposit, this.state.rate)}</p>
-            }
-          />
-        <Divider />
-          <ListItem innerDivStyle={styles.innerDiv} leftIcon={getEtherIcon()} disabled={true}
-          primaryText={
-            <p>Pot<span style={styles.list}>{this.toEther(this.state.totalBalance)}</span></p>
-          }
-          />
-          <ListItem innerDivStyle={styles.innerDiv} leftIcon={<PeopleIcon />} disabled={true}
-          primaryText={attendancyStatus}
-          />
+              }
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemIcon>
+              <DirectionsIcon />
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                <span>
+                  Description
+                  <span
+                    style={styles.list}
+                    dangerouslySetInnerHTML={{ __html: this.state.description_text }}
+                  />
+                </span>
+              }
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemIcon>{getEtherIcon()}</ListItemIcon>
+            <ListItemText
+              primary={<span>Deposit{this.getDepositContent(this.state.deposit)}</span>}
+            />
+          </ListItem>
+          <Divider />
+          <ListItem>
+            <ListItemIcon>{getEtherIcon()}</ListItemIcon>
+            <ListItemText
+              primary={
+                <span>
+                  Pot<span style={styles.list}>{this.toEther(this.state.totalBalance)}</span>
+                </span>
+              }
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemIcon>
+              <PeopleIcon />
+            </ListItemIcon>
+            <ListItemText primary={attendancyStatus} />
+          </ListItem>
         </List>
       </Paper>
     );

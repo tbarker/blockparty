@@ -1,4 +1,4 @@
-const Conference = artifacts.require("Conference.sol");
+const Conference = artifacts.require('Conference.sol');
 
 let deposit, conference;
 let twitterOne = '@twitter1';
@@ -6,44 +6,34 @@ var crypto = require('crypto');
 var cryptoBrowserify = require('crypto-browserify');
 var fs = require('fs');
 
-const getTransaction = function(type, transactionHash){
-  let trxReceipt = web3.eth.getTransactionReceipt(transactionHash)
+const getTransaction = async function(type, transactionHash){
+  let trxReceipt = await web3.eth.getTransactionReceipt(transactionHash);
   return [type, trxReceipt.gasUsed].join('\t');
-}
-
-function awaitEvent(event, handler) {
-  return new Promise((resolve, reject) => {
-    function wrappedHandler(...args) {
-      Promise.resolve(handler(...args)).then(resolve).catch(reject);
-    }
-    event.watch(wrappedHandler);
-  });
-}
+};
 
 contract('Encryption', function(accounts) {
   describe('on registration', function(){
     it('increments registered', async function(){
       var publicKey = fs.readFileSync('./test/fixtures/fixture_public.key', {encoding: 'ascii'});
       var privateKey = fs.readFileSync('./test/fixtures/fixture_private.key', {encoding: 'ascii'});
-      var message = "マコト";
+      var message = 'マコト';
       conference = await Conference.new('', 0, 0, 10, publicKey);
       var publicKeyFromContract = await conference.encryption.call();
-      var encrypted = cryptoBrowserify.publicEncrypt(publicKeyFromContract, new Buffer(message, 'utf-8'));
+      var encrypted = cryptoBrowserify.publicEncrypt(publicKeyFromContract, Buffer.from(message, 'utf-8'));
 
-      console.log(getTransaction('create   ', conference.transactionHash));
-      deposit = (await conference.deposit.call()).toNumber();
+      console.log(await getTransaction('create   ', conference.transactionHash));
+      deposit = BigInt((await conference.deposit.call()).toString());
 
-      let registered = await conference.registerWithEncryption.sendTransaction(twitterOne, encrypted.toString('hex'), {value:deposit});
-      console.log(getTransaction('register   ', registered));
-      let decrypted;
-      let event = conference.RegisterEvent({});
-      let watcher = async function(err, result) {
-        event.stopWatching();
-        if (err) { throw err; }
-        decrypted = crypto.privateDecrypt(privateKey, new Buffer(result.args._encryption, 'hex'));
-        console.log('decrypted', decrypted.toString('utf8'));
-      };
-      await awaitEvent(event, watcher);
-    })
-  })
-})
+      let result = await conference.registerWithEncryption(twitterOne, encrypted.toString('hex'), {value:deposit.toString()});
+      console.log(await getTransaction('register   ', result.tx));
+
+      // In web3 1.x / truffle 5.x, events are in result.logs
+      let registerEvent = result.logs.find(log => log.event === 'RegisterEvent');
+      assert(registerEvent, 'RegisterEvent should be emitted');
+
+      let decrypted = crypto.privateDecrypt(privateKey, Buffer.from(registerEvent.args._encryption, 'hex'));
+      console.log('decrypted', decrypted.toString('utf8'));
+      assert.equal(decrypted.toString('utf8'), message);
+    });
+  });
+});

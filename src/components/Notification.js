@@ -1,68 +1,76 @@
-import React from 'react';
-import {NotificationContainer, NotificationManager} from 'react-notifications';
+import React, { useState, useEffect, useCallback } from 'react';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 
-class Notification extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {};
-  }
+/**
+ * Notification component using MUI Snackbar and Alert
+ * Replaces react-notifications to avoid deprecated findDOMNode usage
+ */
+function Notification({ eventEmitter }) {
+  const [notifications, setNotifications] = useState([]);
 
-  componentDidMount(){
-    this.props.eventEmitter.on('notification', obj => {
-      NotificationManager[obj.status](obj.message);
-      // NotificationManager.info('Info message');
-      // NotificationManager.success('Success message', 'Title here');
-      // NotificationManager.warning('Warning message', 'Close after 3000ms', 3000);
-      // NotificationManager.error('Error message', 'Click me!', 5000, () => {
-      //   alert('callback');
-      // });
-      // this.setState(obj);
-    });
-  }
+  // Map status names to MUI severity
+  const getSeverity = useCallback(status => {
+    switch (status) {
+      case 'success':
+        return 'success';
+      case 'error':
+        return 'error';
+      case 'warning':
+        return 'warning';
+      case 'info':
+      default:
+        return 'info';
+    }
+  }, []);
 
-  render(){
-    return (<div><NotificationContainer/></div>);
-  }
+  useEffect(() => {
+    const handleNotification = obj => {
+      const id = Date.now();
+      setNotifications(prev => [
+        ...prev,
+        {
+          id,
+          message: obj.message,
+          severity: getSeverity(obj.status),
+        },
+      ]);
+    };
+
+    eventEmitter.on('notification', handleNotification);
+
+    return () => {
+      eventEmitter.off('notification', handleNotification);
+    };
+  }, [eventEmitter, getSeverity]);
+
+  const handleClose = useCallback(id => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  return (
+    <>
+      {notifications.map((notification, index) => (
+        <Snackbar
+          key={notification.id}
+          open={true}
+          autoHideDuration={5000}
+          onClose={() => handleClose(notification.id)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          sx={{ top: `${24 + index * 60}px !important` }}
+        >
+          <Alert
+            onClose={() => handleClose(notification.id)}
+            severity={notification.severity}
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            {notification.message}
+          </Alert>
+        </Snackbar>
+      ))}
+    </>
+  );
 }
-
-// const Notification = (props) => (
-//   <div>
-//     Hello
-//   </div>
-// );
-// import React from 'react';
-// import {NotificationContainer, NotificationManager} from 'react-notifications';
-// class Notification extends React.Component {
-//   createNotification = (type) => {
-//     return () => {
-//
-
-//     };
-//   };
-//
-//   render() {
-//     return (
-//       <div>
-//         <button className='btn btn-info'
-//           onClick={this.createNotification('info')}>Info
-//         </button>
-//         <hr/>
-//         <button className='btn btn-success'
-//           onClick={this.createNotification('success')}>Success
-//         </button>
-//         <hr/>
-//         <button className='btn btn-warning'
-//           onClick={this.createNotification('warning')}>Warning
-//         </button>
-//         <hr/>
-//         <button className='btn btn-danger'
-//           onClick={this.createNotification('error')}>Error
-//         </button>
-//
-//         <NotificationContainer/>
-//       </div>
-//     );
-//   }
-// }
 
 export default Notification;

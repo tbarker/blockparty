@@ -16,3 +16,12 @@ coverage
 coverageEnv
 coverage.json
 tmp
+
+# E2E test artifacts
+test-results/
+playwright-report/
+src/__tests__/e2e/.e2e-state.json
+
+# Synpress wallet cache
+.cache-synpress/
+wallet-cache/

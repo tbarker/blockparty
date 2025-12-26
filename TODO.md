@@ -44,13 +44,25 @@ This document tracks upgrades deferred to maintain stability.
 - Removed old Truffle config, migrations, and JavaScript tests
 - Uses `out/` directory for Forge artifacts
 
+### Contract Integration Tests (Level 4)
+
+- Implemented comprehensive integration tests using Anvil + Jest + ethers.js
+- Test files in `src/__tests__/integration/`:
+  - `anvilSetup.js` - Test harness with contract deployment, helpers, time manipulation
+  - `userJourney.test.js` - Full user flows (register, attend, withdraw)
+  - `adminWorkflow.test.js` - Admin operations (config, roles, payback, cancel, clear)
+  - `errorHandling.test.js` - Revert scenarios and edge cases
+- Run with `npm run test:integration` (requires Anvil running)
+- Uses snapshot/revert for test isolation
+- Tests contract interactions directly without browser
+
 ## Deferred
 
 ### React 19 Migration
 
-**Blocked by:** react-notifications uses deprecated `ReactDOM.findDOMNode()`
+**Status:** Unblocked - react-notifications replaced with MUI Snackbar/Alert
 
-**To unblock:** Replace react-notifications with notistack or react-toastify
+**Remaining work:** Update to React 19 and @testing-library/react 16
 
 ### TypeScript Migration
 
@@ -66,42 +78,26 @@ This document tracks upgrades deferred to maintain stability.
 ### Testing
 
 - Build verification tests (`npm run test:build`) - catches webpack/import issues
+- Contract integration tests (`npm run test:integration`) - tests against Anvil
 - Expand beyond smoke tests
 - Add E2E tests with Playwright
 - Target >80% coverage
 
-#### Contract Integration Tests (Level 4)
+#### Future Testing Improvements
 
-Use Anvil (Foundry's local node) for integration testing. Consider:
-
-1. **Full User Journey Tests**
-   - Start Anvil and deploy contracts
-   - Test register -> attend -> withdraw flow
-   - Verify state changes on-chain
-   - Test edge cases (event full, already registered, etc.)
-
-2. **Admin Workflow Tests**
-   - Create event with custom parameters
-   - Mark attendance for multiple participants
-   - Trigger payback
-   - Test cancel flow
-
-3. **ENS Integration Tests**
+1. **ENS Integration Tests**
    - Deploy ENS contracts locally
    - Register names
    - Verify reverse resolution works in UI
 
-4. **Error Handling Tests**
-   - Insufficient funds
-   - Network disconnection
-   - Contract revert scenarios
+2. **Browser E2E Tests**
+   - Use Playwright with wallet mocking
+   - Full UI interaction testing
+   - Visual regression testing
 
-**Implementation Notes:**
-
-- Use `anvil` for local blockchain testing
-- Use `forge script` for deployment
-- Consider running in CI with GitHub Actions
-- May need Playwright for full E2E with browser wallet mocking
+3. **CI Integration**
+   - Run integration tests in GitHub Actions
+   - Start/stop Anvil automatically
 
 ### Code Quality
 
@@ -111,7 +107,7 @@ Use Anvil (Foundry's local node) for integration testing. Consider:
 ### Bug Fixes
 
 - Removed defunct CoinMarketCap API call (`coinmarketcap-nexuist.rhcloud.com` no longer exists)
-- Replace react-notifications to fix `findDOMNode` deprecation warning (also unblocks React 19)
+- ~~Replace react-notifications to fix `findDOMNode` deprecation warning~~ (DONE - replaced with MUI Snackbar/Alert)
 
 ---
 

@@ -18,34 +18,34 @@ class FormInput extends React.Component {
     this.state = {
       address: '',
       name: '',
-      accounts:[],
-      attendees:[],
-      participants:[],
-      detail:{}
+      accounts: [],
+      attendees: [],
+      participants: [],
+      detail: {},
     };
   }
 
-  componentDidMount(){
+  componentDidMount() {
     this.props.eventEmitter.on('accounts_received', accounts => {
       this.setState({
         address: accounts[0] || '',
-        accounts: accounts
+        accounts: accounts,
       });
     });
 
     this.props.eventEmitter.on('participants_updated', participants => {
       this.setState({
-        participants:participants
+        participants: participants,
       });
     });
 
     this.props.eventEmitter.on('detail', detail => {
-      this.setState({detail:detail});
+      this.setState({ detail: detail });
     });
 
     this.props.eventEmitter.on('attendees', attendees => {
       this.setState({
-        attendees:attendees
+        attendees: attendees,
       });
     });
   }
@@ -64,22 +64,25 @@ class FormInput extends React.Component {
         break;
       case 'registerWithEncryption': {
         args.push(this.state.name);
-        const encryptedData = cryptoBrowserify.publicEncrypt(this.state.detail.encryption, Buffer.from(this.state.full_name, 'utf-8'));
+        const encryptedData = cryptoBrowserify.publicEncrypt(
+          this.state.detail.encryption,
+          Buffer.from(this.state.full_name, 'utf-8')
+        );
         args.push(encryptedData.toString('hex'));
         break;
       }
       default:
         break;
     }
-    if(actionName == 'register' || actionName == 'registerWithEncryption'){
+    if (actionName == 'register' || actionName == 'registerWithEncryption') {
       let obj = {
-        action:'register',
-        user:this.state.address,
-        contract:this.state.detail.contractAddress,
+        action: 'register',
+        user: this.state.address,
+        contract: this.state.detail.contractAddress,
         agent: navigator.userAgent,
-        provider:web3.currentProvider.constructor.name,
+        provider: 'ethers.js',
         hostname: window.location.hostname,
-        created_at: new Date()
+        created_at: new Date(),
       };
       this.props.eventEmitter.emit('logger', obj);
     }
@@ -87,61 +90,67 @@ class FormInput extends React.Component {
     this.props.action(actionName, this.state.address.trim(), args);
     this.setState({
       name: '',
-      attendees:[]
+      attendees: [],
     });
     this.props.eventEmitter.emit('attendees', []);
   }
 
-  handleSelect(event){
+  handleSelect(event) {
     this.setState({
       address: event.target.value,
     });
   }
 
-  participantStatus(){
+  participantStatus() {
     var p = this.selectParticipant(this.state.participants, this.state.address);
     if (p) {
       return participantStatus(p, this.state.detail);
-    }else{
+    } else {
       return 'Not registered';
     }
   }
 
-  selectParticipant(participants, address){
-    return participants.filter(function(p){
-       return p.address == address;
+  selectParticipant(participants, address) {
+    return participants.filter(function (p) {
+      return p.address == address;
     })[0];
   }
 
-  isOwner(){
+  isOwner() {
     return this.state.address == this.state.detail.owner;
   }
 
-  isAdmin(){
-    return this.state.detail.admins && this.state.detail.admins.includes(this.state.address) || (this.state.detail.owner == this.state.address);
+  isAdmin() {
+    return (
+      (this.state.detail.admins && this.state.detail.admins.includes(this.state.address)) ||
+      this.state.detail.owner == this.state.address
+    );
   }
 
-  showRegister(){
+  showRegister() {
     return this.state.detail.canRegister && this.participantStatus() == 'Not registered';
   }
 
-  showAttend(){
+  showAttend() {
     return this.state.detail.canAttend;
   }
 
-  showWithdraw(){
-    return this.state.detail.canWithdraw && (this.participantStatus() == 'Won' || this.participantStatus() == 'Cancelled');
+  showWithdraw() {
+    return (
+      this.state.detail.canWithdraw &&
+      (this.participantStatus() == 'Won' || this.participantStatus() == 'Cancelled')
+    );
   }
 
-  showPayback(){
+  showPayback() {
     return this.state.detail.canPayback;
   }
 
-  showCancel(){
+  showCancel() {
     return this.state.detail.canCancel;
   }
 
-  showClear(){
+  showClear() {
     return this.state.detail.ended;
   }
 
@@ -153,14 +162,14 @@ class FormInput extends React.Component {
 
   handleEncryptedField(e) {
     this.setState({
-      full_name: e.target.value
+      full_name: e.target.value,
     });
   }
 
   render() {
     let adminButtons, registerButton, attendButton, warningText;
 
-    if(this.isAdmin()){
+    if (this.isAdmin()) {
       attendButton = (
         <Button
           variant="contained"
@@ -174,7 +183,7 @@ class FormInput extends React.Component {
       );
     }
 
-    if(this.isOwner()){
+    if (this.isOwner()) {
       adminButtons = (
         <Box component="span">
           <Button
@@ -219,14 +228,14 @@ class FormInput extends React.Component {
 
     let encryptionField = null;
     var availableSpots = this.state.detail.limitOfParticipants - this.state.detail.registered;
-    if(this.props.read_only){
+    if (this.props.read_only) {
       registerButton = <span>Connect via Mist/Metamask to be able to register.</span>;
-    }else if(this.state.accounts.length > 0){
-      if(this.state.detail.ended){
+    } else if (this.state.accounts.length > 0) {
+      if (this.state.detail.ended) {
         registerButton = <span>This event is over </span>;
-      }else if (availableSpots <= 0){
+      } else if (availableSpots <= 0) {
         registerButton = <span>No more spots left</span>;
-      }else{
+      } else {
         let actionName = 'register';
         if (this.state.detail.encryption && this.showRegister()) {
           encryptionField = (
@@ -253,9 +262,14 @@ class FormInput extends React.Component {
             RSVP
           </Button>
         );
-        warningText = <Box sx={{textAlign:'center', color:'red'}}>Please be aware that you <strong>cannot</strong> cancel once regiesterd. Please read FAQ section at ABOUT page on top right corner for more detail about this service.</Box>;
+        warningText = (
+          <Box sx={{ textAlign: 'center', color: 'red' }}>
+            Please be aware that you <strong>cannot</strong> cancel once regiesterd. Please read FAQ
+            section at ABOUT page on top right corner for more detail about this service.
+          </Box>
+        );
       }
-    }else{
+    } else {
       registerButton = <span>No account is set</span>;
     }
 
@@ -300,7 +314,9 @@ class FormInput extends React.Component {
               label="Account address"
             >
               {this.state.accounts.map((account, index) => (
-                <MenuItem key={index} value={account}>{account}</MenuItem>
+                <MenuItem key={index} value={account}>
+                  {account}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>

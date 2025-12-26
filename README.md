@@ -70,6 +70,14 @@ By downloading and deploying this software, you agree to our terms and condition
 
 If you are interested in contributing to blockparty, have a look into ["help wanted" tag on Github issues](https://github.com/makoto/blockparty/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).
 
+### Tech Stack
+
+- **Smart Contracts**: Solidity 0.8.20
+- **Contract Testing**: [Foundry/Forge](https://book.getfoundry.sh/)
+- **Frontend**: React 18, MUI v7, ethers.js v6
+- **Build**: Webpack 5
+- **Package Manager**: npm
+
 ### Quick Start (VS Code Dev Container)
 
 The easiest way to get started. Requires [VS Code](https://code.visualstudio.com/), [Docker](https://www.docker.com/products/docker-desktop/), and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
@@ -84,12 +92,19 @@ This gives you Node.js 22, Foundry, and all dependencies ready to go.
 
 ### Local Installation
 
-Requires Node.js 20+ and OpenSSL.
+Requires Node.js 20+ and [Foundry](https://book.getfoundry.sh/getting-started/installation).
 
 ```bash
+# Install Foundry (if not already installed)
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+
+# Clone and install
+git clone https://github.com/makoto/blockparty.git
+cd blockparty
 npm install
 
-# Generate test encryption keys
+# Generate test encryption keys (optional, for encryption tests)
 mkdir -p tmp
 openssl genrsa 2048 > tmp/test_private.key
 openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
@@ -98,15 +113,15 @@ openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
 ### Running Tests
 
 ```bash
-# UI component tests (fast, no blockchain required)
+# Smart contract tests (Forge)
+npm run test              # or: forge test
+npm run test -- -vvv      # verbose output
+
+# UI component tests (Jest)
 npm run test:ui
 
-# Build verification tests (verifies webpack build succeeds)
+# Build verification tests
 npm run test:build
-
-# Smart contract tests
-npx ganache &
-npm run test
 
 # All tests
 npm run test:all
@@ -115,34 +130,59 @@ npm run test:all
 npm run lint
 ```
 
-The build verification tests (`test:build`) catch webpack configuration issues, missing polyfills, and import errors that component tests might miss.
-
 ### Running Locally
 
 ```bash
-npx ganache                                # Start local node
-npx truffle migrate --network development  # Deploy contracts
-npm run dev                                # Start dev server at http://localhost:8080
+# Start local Ethereum node (Anvil) with chain ID 1337
+anvil --chain-id 1337
+# Or use npm script:
+npm run anvil
+
+# Deploy contracts (in a new terminal)
+forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545
+
+# Start dev server at http://localhost:8080
+CONTRACT_ADDRESS=<deployed-address> npm run dev
 ```
 
-NOTE: MetaMask accounts won't have Ether on Ganache. Use incognito mode to use the local node's default accounts.
+NOTE: MetaMask accounts won't have Ether on Anvil. Use incognito mode to use Anvil's default funded accounts, or import one of Anvil's private keys.
+
+### Contract Deployment
+
+#### Local Development
+
+```bash
+# Start Anvil (Foundry's local node) with chain ID 1337
+anvil --chain-id 1337
+
+# Deploy with default settings
+forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545
+
+# Deploy with custom settings
+CONFERENCE_NAME="My Event" \
+CONFERENCE_DEPOSIT=0.05ether \
+CONFERENCE_LIMIT=50 \
+forge script script/Deploy.s.sol:DeployConference --broadcast --rpc-url http://localhost:8545
+```
+
+#### Production Deployment
+
+```bash
+# Set your private key and RPC URL
+export PRIVATE_KEY=your_private_key
+export RPC_URL=https://mainnet.infura.io/v3/your-project-id
+
+# Deploy
+CONFERENCE_NAME="BlockParty Event" \
+CONFERENCE_LIMIT=100 \
+forge script script/Deploy.s.sol:DeployConference --broadcast --rpc-url $RPC_URL
+```
 
 ### ENS Configuration (Development)
 
-When deploying to the development network, ENS contracts are automatically deployed and their addresses are logged. To use the ENS helper script for registering names:
+The frontend uses ethers.js built-in ENS support. For production networks (mainnet, testnets), ENS resolution works automatically.
 
-```bash
-# After migration, note the logged ENS contract addresses, then:
-npx truffle exec scripts/ens.js \
-  -n myname \
-  -a 0xYourAddress \
-  --ens 0xENSRegistryAddress \
-  --resolver 0xPublicResolverAddress \
-  --reverse 0xReverseRegistrarAddress \
-  --network development
-```
-
-Alternatively, you can set the ENS address as an environment variable for the frontend:
+For local development with ENS:
 
 ```bash
 # Set ENS Registry address for the frontend
@@ -152,35 +192,55 @@ export ENS_ADDRESS=0xYourENSRegistryAddress
 npm run dev
 ```
 
-For production networks (mainnet, testnets), the frontend automatically uses the canonical ENS registry addresses.
-
-### Building
+### Building for Production
 
 ```bash
+# Build contracts
+forge build
+
+# Build frontend (includes linting)
 npm run build
-# Upload contents of build/ directory
+
+# Upload contents of build/ directory to your hosting provider
 ```
 
-### Contract Configuration
+### Project Structure
 
-Event name and participant limit are configurable at deployment:
+```
+blockparty/
+├── contracts/           # Solidity smart contracts
+│   ├── Conference.sol   # Main event contract
+│   ├── GroupAdmin.sol   # Multi-admin management
+│   └── zeppelin/        # OpenZeppelin-style base contracts
+├── test/                # Forge tests (Solidity)
+│   ├── Conference.t.sol
+│   └── GroupAdmin.t.sol
+├── script/              # Forge deployment scripts
+│   └── Deploy.s.sol
+├── src/                 # React frontend
+│   ├── index.js         # Main entry point (ethers.js)
+│   ├── components/      # React components
+│   └── __tests__/       # Jest UI tests
+├── lib/                 # Forge dependencies (forge-std)
+├── out/                 # Forge build output (ABIs, bytecode)
+├── foundry.toml         # Forge configuration
+└── package.json         # npm configuration
+```
+
+### Gas Reports
 
 ```bash
-npx truffle migrate --config '{"name":"My Event", "limitOfParticipants":50}'
+# Run tests with gas reporting
+forge test --gas-report
 ```
 
-Encryption of participant names (experimental):
+## Contributing
 
-```bash
-npx truffle migrate --config '{"name":"My Event", "encryption":"./tmp/test_public.key"}'
-```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `npm run test:all`
+5. Run linting: `npm run lint`
+6. Submit a pull request
 
-## Deploying to Mainnet
-
-Deploys via Infura:
-
-```bash
-npx truffle migrate --network mainnet --mnemonic $SECRET
-```
-
-See `truffle-config.js` and `scripts/util/set_gas.js` for gas price configuration.
+See [TODO.md](./TODO.md) for planned improvements and known issues.

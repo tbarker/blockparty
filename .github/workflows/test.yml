@@ -8,6 +8,7 @@ on:
 
 env:
   NODE_VERSION: '22'
+  FOUNDRY_PROFILE: ci
 
 jobs:
   lint:
@@ -57,59 +58,52 @@ jobs:
           fail_ci_if_error: false
 
   smart-contracts:
-    name: Smart Contract Tests
+    name: Smart Contract Tests (Forge)
     runs-on: ubuntu-latest
-    container:
-      image: node:22-bookworm
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install system dependencies
-        run: |
-          apt-get update && apt-get install -y python3 make g++ openssl
-          
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
 
-      - name: Generate test encryption keys
-        run: |
-          mkdir -p tmp
-          openssl genrsa 2048 > tmp/test_private.key
-          openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
+      - name: Run Forge build
+        run: forge build
 
-      - name: Start Ganache and run tests
-        run: |
-          # Start Ganache in background with sufficient accounts for stress tests
-          npx ganache --wallet.totalAccounts 300 --wallet.defaultBalance 1000 --chain.hardfork istanbul &
-          GANACHE_PID=$!
-          
-          # Wait for Ganache to start
-          echo "Waiting for Ganache to start..."
-          sleep 10
-          
-          # Verify Ganache is running
-          curl -s -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://127.0.0.1:8545 || (echo "Ganache failed to start" && exit 1)
-          
-          # Run smart contract tests
-          npm test
-          
-          # Cleanup
-          kill $GANACHE_PID || true
+      - name: Run Forge tests
+        run: forge test -vvv
+
+      - name: Run Forge coverage
+        run: forge coverage
+        continue-on-error: true
 
   build:
     name: Build Check
     runs-on: ubuntu-latest
     container:
       image: node:22-bookworm
-    needs: [lint, react-ui]
+    needs: [lint, react-ui, smart-contracts]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install dependencies
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build contracts
+        run: forge build
+
+      - name: Install npm dependencies
         run: npm ci
 
       - name: Build frontend

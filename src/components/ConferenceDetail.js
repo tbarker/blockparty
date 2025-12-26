@@ -73,7 +73,11 @@ class ConferenceDetail extends React.Component {
   }
 
   toNumber(value) {
-    if (value) return value.toNumber();
+    if (value === null || value === undefined) return 0;
+    // Handle ethers.js v6 BigInt, legacy BigNumber, or plain numbers
+    if (typeof value === 'bigint') return Number(value);
+    if (typeof value.toNumber === 'function') return value.toNumber();
+    return Number(value);
   }
 
   getNameContent(name, contractAddress) {

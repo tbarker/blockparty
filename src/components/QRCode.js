@@ -7,27 +7,34 @@ class QRCode extends React.Component {
     super(props);
   }
 
-  handleSearchField(_event){
-    web3.currentProvider
-      .scanQRCode()
-      .then(data => {
-        console.log('QR Scanned:', data);
-        this.props.eventEmitter.emit('search', data);
-      })
-      .catch(err => {
-        console.log('Error:', err);
-      });
+  handleSearchField(_event) {
+    // Check for mobile wallet QR scanner support
+    if (window.ethereum && window.ethereum.scanQRCode) {
+      window.ethereum
+        .scanQRCode()
+        .then(data => {
+          console.log('QR Scanned:', data);
+          this.props.eventEmitter.emit('search', data);
+        })
+        .catch(err => {
+          console.log('Error:', err);
+        });
+    }
   }
 
   render() {
-    if(typeof web3 !== 'undefined' && web3.currentProvider && web3.currentProvider.scanQRCode){
+    // Only show QR button if the provider supports scanning
+    if (typeof window !== 'undefined' && window.ethereum && window.ethereum.scanQRCode) {
       return (
         <IconButton onClick={this.handleSearchField.bind(this)}>
           {/* from https://materialdesignicons.com */}
-          <Avatar src={require('../images/qrcode-scan.png')} sx={{ width: 26, height: 26, bgcolor: 'white' }} />
+          <Avatar
+            src={require('../images/qrcode-scan.png')}
+            sx={{ width: 26, height: 26, bgcolor: 'white' }}
+          />
         </IconButton>
       );
-    }else{
+    } else {
       return null;
     }
   }

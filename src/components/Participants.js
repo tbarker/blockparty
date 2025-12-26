@@ -95,7 +95,11 @@ class Participants extends React.Component {
   }
 
   toNumber(value) {
-    if (value) return value.toNumber();
+    if (value === null || value === undefined) return 0;
+    // Handle ethers.js v6 BigInt, legacy BigNumber, or plain numbers
+    if (typeof value === 'bigint') return Number(value);
+    if (typeof value.toNumber === 'function') return value.toNumber();
+    return Number(value);
   }
 
   handleSearchField(event) {
@@ -138,7 +142,7 @@ class Participants extends React.Component {
       case 'Won':
       case 'Withdrawn':
         color = 'green';
-        amount = web3.utils.fromWei(this.state.detail.payoutAmount.toString(), 'ether');
+        amount = this.props.web3.utils.fromWei(this.state.detail.payoutAmount.toString(), 'ether');
         break;
       case 'Cancelled':
         color = 'red';

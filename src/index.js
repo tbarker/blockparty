@@ -1,5 +1,4 @@
 import './stylesheets/app.css';
-import 'react-notifications/lib/notifications.css';
 import React from 'react';
 import EventEmitter from 'event-emitter';
 import { createRoot } from 'react-dom/client';
@@ -106,7 +105,11 @@ window.onload = function () {
 
     try {
       // Get contract address from config or environment
-      if (
+      // Priority: E2E config > app_config > env variable
+      if (window.__E2E_CONFIG__ && window.__E2E_CONFIG__.contractAddress) {
+        contractAddress = window.__E2E_CONFIG__.contractAddress;
+        console.log('Using E2E contract address:', contractAddress);
+      } else if (
         network_obj &&
         network_obj.contract_addresses &&
         network_obj.contract_addresses['Conference']

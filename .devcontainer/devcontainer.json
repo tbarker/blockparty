@@ -7,7 +7,7 @@
   "features": {
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
-  "forwardPorts": [8545, 8080],
+  "forwardPorts": [8545, 8080, 3000],
   "portsAttributes": {
     "8545": {
       "label": "Ethereum RPC (Anvil/Ganache)",
@@ -16,6 +16,10 @@
     "8080": {
       "label": "Webpack Dev Server",
       "onAutoForward": "openBrowser"
+    },
+    "3000": {
+      "label": "E2E Test Server",
+      "onAutoForward": "notify"
     }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",

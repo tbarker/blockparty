@@ -21,6 +21,10 @@ forge install --no-git 2>/dev/null || echo "Forge dependencies already installed
 echo "Building contracts..."
 forge build
 
+# Install Playwright browsers for E2E testing
+echo "Installing Playwright browsers..."
+npx playwright install chromium
+
 # Copy test keys to project tmp directory if they don't exist
 echo "Setting up test encryption keys..."
 mkdir -p tmp
@@ -34,7 +38,10 @@ echo "=== Setup Complete ==="
 echo ""
 echo "Available commands:"
 echo "  npm run dev              - Start webpack dev server (http://localhost:8080)"
+echo "  npm run start            - Start dev server on port 3000 (for E2E tests)"
 echo "  npm run test:ui          - Run React component tests"
+echo "  npm run test:integration - Run contract integration tests (requires Anvil)"
+echo "  npm run test:e2e         - Run E2E browser tests (requires Anvil)"
 echo "  npm run lint             - Run ESLint and Solhint"
 echo ""
 echo "Smart contract development (Foundry):"
@@ -44,8 +51,11 @@ echo "  forge test -vvv          - Run tests with verbose output"
 echo "  forge build              - Compile contracts"
 echo "  forge coverage           - Generate coverage report"
 echo ""
+echo "E2E Testing:"
+echo "  npm run test:e2e         - Run E2E tests (headless)"
+echo "  npm run test:e2e:headed  - Run E2E tests with visible browser"
+echo "  npm run test:e2e:debug   - Run E2E tests with Playwright inspector"
+echo ""
 echo "Deployment:"
 echo "  npm run deploy:local     - Deploy to local Anvil node"
-echo "  # Or manually:"
-echo "  forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545"
 echo ""

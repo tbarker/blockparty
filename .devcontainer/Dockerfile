@@ -4,6 +4,7 @@
 FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
 
 # Install system dependencies for native module compilation and Ethereum development
+# Also includes dependencies required by Playwright for E2E testing
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -11,6 +12,22 @@ RUN apt-get update && apt-get install -y \
     git \
     openssl \
     curl \
+    # Playwright/Chromium dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up workspace directory

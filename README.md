@@ -112,6 +112,13 @@ openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
 
 ### Running Tests
 
+The project has four levels of testing:
+
+1. **Smart Contract Tests** (Forge/Solidity) - Unit tests for the Solidity contracts
+2. **UI Component Tests** (Jest/React Testing Library) - Unit tests for React components
+3. **Integration Tests** (Jest/Anvil) - Tests contract interactions from JavaScript
+4. **E2E Tests** (Playwright) - Full browser tests with mocked wallet
+
 ```bash
 # Smart contract tests (Forge)
 npm run test              # or: forge test
@@ -123,12 +130,25 @@ npm run test:ui
 # Build verification tests
 npm run test:build
 
-# All tests
+# Contract integration tests (requires Anvil running)
+npm run anvil             # In terminal 1
+npm run test:integration  # In terminal 2
+
+# E2E browser tests (Playwright - starts Anvil automatically)
+npm run test:e2e          # headless
+npm run test:e2e:headed   # visible browser (requires display)
+
+# All offline tests (excludes integration and E2E)
 npm run test:all
+
+# Full test suite (includes integration tests - requires Anvil)
+npm run test:full
 
 # Linting
 npm run lint
 ```
+
+The E2E tests use a mock Ethereum provider that simulates MetaMask while forwarding transactions to a local Anvil node. This allows testing the full user flow without requiring a real browser extension.
 
 ### Running Locally
 

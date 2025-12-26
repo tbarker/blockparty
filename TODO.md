@@ -44,13 +44,50 @@ This document tracks upgrades deferred to maintain stability.
 - Removed old Truffle config, migrations, and JavaScript tests
 - Uses `out/` directory for Forge artifacts
 
-## Deferred
+### Contract Integration Tests (Level 4)
+
+- Implemented comprehensive integration tests using Anvil + Jest + ethers.js
+- Test files in `src/__tests__/integration/`:
+  - `anvilSetup.js` - Test harness with contract deployment, helpers, time manipulation
+  - `userJourney.test.js` - Full user flows (register, attend, withdraw)
+  - `adminWorkflow.test.js` - Admin operations (config, roles, payback, cancel, clear)
+  - `errorHandling.test.js` - Revert scenarios and edge cases
+- Run with `npm run test:integration` (requires Anvil running)
+- Uses snapshot/revert for test isolation
+- Tests contract interactions directly without browser
+
+## Completed
 
 ### React 19 Migration
 
-**Blocked by:** react-notifications uses deprecated `ReactDOM.findDOMNode()`
+**Status:** Complete
 
-**To unblock:** Replace react-notifications with notistack or react-toastify
+- Replaced react-notifications with MUI Snackbar/Alert (removed findDOMNode deprecation)
+- Upgraded React 18.3.1 -> 19.x
+- Upgraded react-dom 18.3.1 -> 19.x
+- Upgraded @testing-library/react 14.x -> 16.x
+
+## Deferred
+
+### Synpress for E2E Wallet Testing
+
+**Current:** Custom `mockEthereum.js` that simulates MetaMask and forwards RPC to Anvil
+**Alternative:** Synpress (`@synthetixio/synpress`) - E2E framework with real MetaMask automation
+
+**Why deferred:**
+
+- Current custom approach is simpler and faster (no extension overhead)
+- Synpress requires Xvfb/display server in CI for browser extensions
+- May have Docker/devcontainer compatibility issues
+- Custom mock is working and sufficient for current needs
+
+**Revisit if:**
+
+- Need to test actual MetaMask-specific behaviors (signing UX, network switching prompts)
+- Custom mock becomes a maintenance burden
+- Synpress improves headless/container support
+
+**Note:** `@depay/web3-mock` was evaluated but is not suitable - it mocks RPC responses entirely rather than forwarding to a real blockchain.
 
 ### TypeScript Migration
 
@@ -66,42 +103,34 @@ This document tracks upgrades deferred to maintain stability.
 ### Testing
 
 - Build verification tests (`npm run test:build`) - catches webpack/import issues
+- Contract integration tests (`npm run test:integration`) - tests against Anvil
 - Expand beyond smoke tests
 - Add E2E tests with Playwright
 - Target >80% coverage
 
-#### Contract Integration Tests (Level 4)
+### E2E Tests (Playwright)
 
-Use Anvil (Foundry's local node) for integration testing. Consider:
+**Status:** Complete
 
-1. **Full User Journey Tests**
-   - Start Anvil and deploy contracts
-   - Test register -> attend -> withdraw flow
-   - Verify state changes on-chain
-   - Test edge cases (event full, already registered, etc.)
+- Implemented E2E tests using Playwright + custom wallet mock
+- Test files in `src/__tests__/e2e/`:
+  - `registration.spec.mjs` - User registration flow
+  - `attendance.spec.mjs` - Admin attendance marking
+  - `withdrawal.spec.mjs` - Withdrawal after event ends
+- Custom `mockEthereum.js` simulates MetaMask, forwards transactions to Anvil
+- Run with `npm run test:e2e`
+- All 14 tests passing in CI
 
-2. **Admin Workflow Tests**
-   - Create event with custom parameters
-   - Mark attendance for multiple participants
-   - Trigger payback
-   - Test cancel flow
+#### Future Testing Improvements
 
-3. **ENS Integration Tests**
+1. **ENS Integration Tests**
    - Deploy ENS contracts locally
    - Register names
    - Verify reverse resolution works in UI
 
-4. **Error Handling Tests**
-   - Insufficient funds
-   - Network disconnection
-   - Contract revert scenarios
-
-**Implementation Notes:**
-
-- Use `anvil` for local blockchain testing
-- Use `forge script` for deployment
-- Consider running in CI with GitHub Actions
-- May need Playwright for full E2E with browser wallet mocking
+2. **Visual Regression Testing**
+   - Add Playwright visual comparison tests
+   - Catch unintended UI changes
 
 ### Code Quality
 
@@ -111,7 +140,7 @@ Use Anvil (Foundry's local node) for integration testing. Consider:
 ### Bug Fixes
 
 - Removed defunct CoinMarketCap API call (`coinmarketcap-nexuist.rhcloud.com` no longer exists)
-- Replace react-notifications to fix `findDOMNode` deprecation warning (also unblocks React 19)
+- ~~Replace react-notifications to fix `findDOMNode` deprecation warning~~ (DONE - replaced with MUI Snackbar/Alert)
 
 ---
 

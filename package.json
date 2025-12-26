@@ -18,11 +18,18 @@
     "forge:test:verbose": "forge test -vvv",
     "forge:coverage": "forge coverage",
     "test": "forge test",
-    "test:ui": "jest --config jest.config.js --testPathIgnorePatterns='integration/buildVerification'",
-    "test:ui:watch": "jest --config jest.config.js --watch --testPathIgnorePatterns='integration/buildVerification'",
-    "test:ui:coverage": "jest --config jest.config.js --coverage --testPathIgnorePatterns='integration/buildVerification'",
+    "test:ui": "jest --config jest.config.js --testPathIgnorePatterns='integration/'",
+    "test:ui:watch": "jest --config jest.config.js --watch --testPathIgnorePatterns='integration/'",
+    "test:ui:coverage": "jest --config jest.config.js --coverage --testPathIgnorePatterns='integration/'",
     "test:build": "jest --config jest.config.js --testPathPattern='integration/buildVerification' --runInBand",
+    "test:integration": "jest --config jest.config.js --testPathPattern='integration/(userJourney|adminWorkflow|errorHandling)' --runInBand --testTimeout=60000",
+    "test:integration:verbose": "jest --config jest.config.js --testPathPattern='integration/(userJourney|adminWorkflow|errorHandling)' --runInBand --testTimeout=60000 --verbose",
     "test:all": "npm run test && npm run test:ui && npm run test:build",
+    "test:full": "npm run test && npm run test:ui && npm run test:integration",
+    "test:e2e": "npx playwright test --config playwright.config.mjs",
+    "test:e2e:headed": "npx playwright test --config playwright.config.mjs --headed",
+    "test:e2e:debug": "npx playwright test --config playwright.config.mjs --debug",
+    "start": "webpack serve --mode development --port 3000",
     "dev": "webpack serve --mode development",
     "anvil": "anvil --chain-id 1337",
     "deploy:local": "forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
@@ -42,10 +49,10 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@ensdomains/ens": "^0.6.2",
-    "@ensdomains/resolver": "^0.3.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@ensdomains/ens": "^0.6.2",
+    "@ensdomains/resolver": "^0.3.1",
     "@mui/icons-material": "^7.0.0",
     "@mui/material": "^7.0.0",
     "axios": "^1.9.0",
@@ -60,9 +67,8 @@
     "moment": "^2.30.1",
     "path-browserify": "^1.0.1",
     "prompt": "^1.3.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-notifications": "^1.7.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "sol-merger": "^4.4.2",
     "style-loader": "^4.0.0",
     "url-loader": "^4.1.1",
@@ -71,15 +77,15 @@
   "devDependencies": {
     "@babel/core": "^7.28.0",
     "@babel/eslint-parser": "^7.28.0",
-    "@eslint/js": "^9.0.0",
-    "globals": "^16.0.0",
     "@babel/plugin-transform-runtime": "^7.28.0",
     "@babel/preset-env": "^7.28.0",
     "@babel/preset-react": "^7.28.0",
     "@babel/runtime": "^7.28.0",
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.57.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.0",
-    "@testing-library/react": "^14.3.1",
+    "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.6.0",
     "assert": "^2.1.0",
     "autoprefixer": "^10.4.21",
@@ -91,6 +97,7 @@
     "eslint": "^9.0.0",
     "eslint-plugin-react": "^7.37.0",
     "fs-extra": "^11.3.0",
+    "globals": "^16.0.0",
     "html-webpack-plugin": "^5.6.0",
     "https-browserify": "^1.0.0",
     "identity-obj-proxy": "^3.0.0",
@@ -113,17 +120,17 @@
     "webpack-dev-server": "^5.2.0"
   },
   "overrides": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "comments": {
     "_dependencies_notes": "DEPENDENCY UPGRADE NOTES - These cannot be stored in package.json directly, see DEPENDENCIES.md",
     "_upgraded": [
-      "react: 16.x -> 18.x (React 19 incompatible with react-notifications)",
-      "react-dom: 16.x -> 18.x (matches React)",
+      "react: 16.x -> 18.x -> 19.x (latest)",
+      "react-dom: 16.x -> 18.x -> 19.x (matches React)",
       "@mui/material: 5.x -> 7.x (skipped 6.x, direct to latest)",
       "@mui/icons-material: 5.x -> 7.x (matches MUI)",
-      "@testing-library/react: 14.x (React 18 compatible)",
+      "@testing-library/react: 14.x -> 16.x (React 19 compatible)",
       "eslint: 8.x -> 9.x (new flat config format)",
       "mathjs: 12.x -> 14.x (performance improvements)",
       "css-loader: 6.x -> 7.x (webpack 5 optimizations)",
@@ -147,10 +154,11 @@
       "bluebird: Removed - native Promises are sufficient",
       "coveralls: Removed - deprecated, use alternatives",
       "eth-gas-reporter: Removed - requires truffle",
-      "@digix/tempo: Removed - deprecated testing utility"
+      "@digix/tempo: Removed - deprecated testing utility",
+      "react-notifications: Removed - replaced with MUI Snackbar/Alert (used deprecated findDOMNode)",
+      "@depay/web3-mock: Removed - not used; E2E tests use custom mock that forwards to real Anvil"
     ],
     "_cannot_upgrade": [
-      "react-notifications: 1.7.4 is latest, unmaintained since 2020",
       "event-emitter: 0.3.5 is latest, stable and works",
       "file-loader: 6.2.0 is latest, webpack 5 native approach preferred",
       "url-loader: 4.1.1 is latest, webpack 5 asset modules preferred",
@@ -164,11 +172,12 @@
       "ESLint 9 requires new flat config format (eslint.config.mjs)",
       "MUI 7 has theming and component API changes",
       "React 18 uses createRoot API (already migrated)",
+      "React 19: no breaking changes for this codebase",
       "chai 5 is ESM-only"
     ],
-    "_blocked_upgrades": [
-      "React 19: blocked by react-notifications using deprecated ReactDOM.findDOMNode()",
-      "@testing-library/react 16: requires React 19"
+    "_recent_fixes": [
+      "Replaced react-notifications with MUI Snackbar/Alert to remove findDOMNode deprecation",
+      "Upgraded to React 19 and @testing-library/react 16"
     ]
   }
 }

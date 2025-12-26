@@ -1,7 +1,7 @@
 import React from 'react';
-import FlatButton from 'material-ui/FlatButton';
+import Button from '@mui/material/Button';
 
-export default class Instruction extends React.Component {
+export default class NetworkLabel extends React.Component {
   constructor(props) {
     super(props);
     if(props.read_only){
@@ -24,16 +24,31 @@ export default class Instruction extends React.Component {
           color: color,
           text: obj.name
         });
-      })
+      });
     }
   }
 
   render(){
+    if (!this.state.text) {
+      return null;
+    }
     return (
-      <FlatButton
-        style={{backgroundColor:this.state.color, disabled:true, color:'white'}}
-        label={this.state.text}
-      />
+      <Button
+        sx={{
+          backgroundColor: this.state.color,
+          color: 'white',
+          '&:hover': {
+            backgroundColor: this.state.color,
+          },
+          '&.Mui-disabled': {
+            backgroundColor: this.state.color,
+            color: 'white',
+          }
+        }}
+        disabled
+      >
+        {this.state.text}
+      </Button>
     );
   }
 }

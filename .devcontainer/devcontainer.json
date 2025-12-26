@@ -1,0 +1,45 @@
+{
+	"name": "BlockParty Development",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
+	},
+	"features": {
+		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+	},
+	"forwardPorts": [
+		8545,
+		8080
+	],
+	"portsAttributes": {
+		"8545": {
+			"label": "Ethereum RPC (Anvil/Ganache)",
+			"onAutoForward": "notify"
+		},
+		"8080": {
+			"label": "Webpack Dev Server",
+			"onAutoForward": "openBrowser"
+		}
+	},
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"Anthropic.claude-code",
+				"JuanBlanco.solidity",
+				"NomicFoundation.hardhat-solidity",
+				"dbaeumer.vscode-eslint",
+				"esbenp.prettier-vscode"
+			],
+			"settings": {
+				"solidity.compileUsingRemoteVersion": "v0.8.20",
+				"editor.formatOnSave": true,
+				"editor.defaultFormatter": "esbenp.prettier-vscode",
+				"[solidity]": {
+					"editor.defaultFormatter": "JuanBlanco.solidity"
+				}
+			}
+		}
+	},
+	"remoteUser": "node"
+}

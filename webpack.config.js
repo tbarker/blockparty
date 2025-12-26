@@ -1,57 +1,106 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
   entry: './src/index.js',
   output: {
     path: path.resolve(__dirname, 'build'),
-    filename: 'app.js'
+    filename: 'app.js',
   },
   plugins: [
     // Copy our app's index.html to the build folder.
-    new CopyWebpackPlugin([
-      { from: './public/index.html', to: "index.html" }
-    ])
+    new CopyWebpackPlugin({
+      patterns: [{ from: './public/index.html', to: 'index.html' }],
+    }),
+    // Provide polyfills for Node.js core modules (required by Web3)
+    new webpack.ProvidePlugin({
+      Buffer: ['buffer', 'Buffer'],
+      process: 'process/browser',
+    }),
+    // Expose environment variables to the frontend
+    new webpack.DefinePlugin({
+      'process.env.ENS_ADDRESS': JSON.stringify(process.env.ENS_ADDRESS),
+    }),
+  ],
+  resolve: {
+    // Polyfills for Node.js core modules used by Web3 and @truffle/contract
+    fallback: {
+      crypto: require.resolve('crypto-browserify'),
+      stream: require.resolve('stream-browserify'),
+      buffer: require.resolve('buffer'),
+      http: require.resolve('stream-http'),
+      https: require.resolve('https-browserify'),
+      os: require.resolve('os-browserify/browser'),
+      url: require.resolve('url'),
+      assert: require.resolve('assert'),
+      path: require.resolve('path-browserify'),
+      fs: false,
+      net: false,
+      tls: false,
+      child_process: false,
+      vm: false,
+    },
+    extensions: ['.js', '.jsx', '.json'],
+  },
+  // Ignore critical dependency warnings from ethers.js (bundled in @truffle/contract)
+  // These are false positives from dynamic require() in minified code
+  ignoreWarnings: [
+    {
+      module: /node_modules\/ethers/,
+      message: /Critical dependency/,
+    },
   ],
   module: {
-    loaders: [
+    rules: [
       {
-         test: /\.json$/,
-         loader: 'json-loader'
-      },
-      {
-         test: /\.css$/,
-         loaders: [ 'style-loader', 'css-loader' ]
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
       },
       // "file" loader makes sure those assets get served by WebpackDevServer.
       // When you `import` an asset, you get its (virtual) filename.
       // In production, they would get copied to the `build` folder.
       {
         test: /\.(ico|jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2)(\?.*)?$/,
-        loader: 'file-loader',
-        query: {
-          name: 'static/media/[name].[hash:8].[ext]'
-        }
+        type: 'asset/resource',
+        generator: {
+          filename: 'static/media/[name].[hash:8][ext]',
+        },
       },
       // "url" loader works just like "file" loader but it also embeds
       // assets smaller than specified size as data URLs to avoid requests.
       {
         test: /\.(mp4|webm|wav|mp3|m4a|aac|oga)(\?.*)?$/,
-        loader: 'url-loader',
-        query: {
-          limit: 10000,
-          name: 'static/media/[name].[hash:8].[ext]'
-        }
+        type: 'asset',
+        parser: {
+          dataUrlCondition: {
+            maxSize: 10000,
+          },
+        },
+        generator: {
+          filename: 'static/media/[name].[hash:8][ext]',
+        },
       },
       {
-        test: /\.js$/,
-        exclude: /(node_modules|bower_components)/,
-        loader: 'babel-loader',
-        query: {
-          presets: ['es2015'],
-          plugins: ['transform-runtime']
-        }
-      }
-    ]
-  }
-}
+        test: /\.jsx?$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env', '@babel/preset-react'],
+            plugins: ['@babel/plugin-transform-runtime'],
+          },
+        },
+      },
+    ],
+  },
+  devServer: {
+    static: {
+      directory: path.join(__dirname, 'public'),
+    },
+    compress: true,
+    port: 8080,
+    hot: true,
+  },
+};

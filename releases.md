@@ -1,3 +1,13 @@
+## v0.9
+
+- Upgrade to Solidity 0.8.20
+- Upgrade to React 18 and MUI v7
+- Upgrade to Node.js 22 LTS
+- Add VS Code Dev Container
+- Migrate CI from Travis to GitHub Actions
+- Add ESLint 9 with flat config
+- Add Solhint for Solidity linting
+
 ## v0.4
 
 - Add Bounty program

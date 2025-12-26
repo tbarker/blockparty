@@ -1,9 +1,9 @@
-let Conference = artifacts.require("./Conference.sol");
+let Conference = artifacts.require('./Conference.sol');
 let fs = require('fs');
 let moment = require('moment');
 let setGas = require('./util/set_gas');
 let setContract = require('./util/set_contract');
-const Data = require('../src/components/Data.js')
+const Data = require('../src/components/Data.js');
 
 let InputDataDecoder = require('ethereum-input-data-decoder');
 let decoder = new InputDataDecoder(Conference.abi);
@@ -17,14 +17,14 @@ let getTransaction = function(web3, trxHash){
 };
 
 let getTotal = function(name, list){
-  var total = 0
-  list.map(function(l){return total+= parseInt(l[name])})
+  var total = 0;
+  list.map(function(l){return total+= parseInt(l[name]);});
   return total;
-}
+};
 
 let getAvg = function(name, list){
   return getTotal(name, list) / list.length;
-}
+};
 
 var header = [];
 var showReport = async function(event){
@@ -46,7 +46,7 @@ var showReport = async function(event){
       to: r.to,
       total: (parseInt(r.gasPrice) * parseInt(r.gasUsed)),
       gas:r.gas, gasPrice:r.gasPrice, gasUsed:r.gasUsed, isError:r.isError
-    })
+    });
   }
 
   if (results.length == 0) {
@@ -55,24 +55,24 @@ var showReport = async function(event){
 
   let owner = results[0].from;
 
-  owners = results.filter(function(r){ return r.from == owner })
-  users = results.filter(function(r){ return r.from != owner })
+  owners = results.filter(function(r){ return r.from == owner; });
+  users = results.filter(function(r){ return r.from != owner; });
   registers = results.filter(function(r){
-    return r.name == 'registerWithEncryption' || r.name == 'register'
-  })
+    return r.name == 'registerWithEncryption' || r.name == 'register';
+  });
   attend = results.filter(
-    function(r){ return r.name == 'attend' }
-  )
+    function(r){ return r.name == 'attend'; }
+  );
   attendWithConfirmation = results.filter(
-    function(r){ return r.name == 'attendWithConfirmation' }
-  )
-  payback = results.filter(function(r){ return r.name == 'payback' })[0]
-  withdraws = results.filter(function(r){ return r.name == 'withdraw' })
+    function(r){ return r.name == 'attendWithConfirmation'; }
+  );
+  payback = results.filter(function(r){ return r.name == 'payback'; })[0];
+  withdraws = results.filter(function(r){ return r.name == 'withdraw'; });
   // withdraws.map(function(w){
   //   console.log((w.timestamp - payback.timestamp) / 1000 / 60 / 60 / 24)
   // })
-  errors = results.filter(function(r){ return r.isError != '0' })
-  var index = 0
+  errors = results.filter(function(r){ return r.isError != '0'; });
+  var index = 0;
   header[index++] = 'address';
   row.push(event.address);
   header[index++] = 'name';
@@ -83,14 +83,14 @@ var showReport = async function(event){
   row.push(event.ether_price);
   header[index++] = 'RSVP';
   let registered = (await conference.registered.call());
-  row.push(registered)
+  row.push(registered);
   header[index++] = 'attended';
   let attended = (await conference.attended.call());
   // for (var i = 0; i < attended - withdraws.length; i++) {
   //   console.log(7)
   // }
 
-  row.push(attended)
+  row.push(attended);
   header[index++] = 'ratio';
   row.push(attended/registered);
   header[index++] = 'payout';
@@ -99,7 +99,7 @@ var showReport = async function(event){
   header[index++] = 'trxs';
   row.push(results.length);
   header[index++] = 'errors';
-  row.push(errors.length)
+  row.push(errors.length);
   header[index++] = 'gasPrice_avg(gwei)';
   row.push(parseFloat(web3.fromWei(getAvg('gasPrice', results), 'gwei')));
   header[index++] = 'total';
@@ -113,13 +113,13 @@ var showReport = async function(event){
   header[index++] = 'withdraw_avg';
   row.push(parseFloat(web3.fromWei(getAvg('total', withdraws), 'ether')) * ether_price);
   return row;
-}
+};
 
 module.exports = async function(callback) {
   var rows = [];
   for (var i = 0; i < Data.length; i++) {
-    rows.push((await showReport(Data[i])))
+    rows.push((await showReport(Data[i])));
   }
   console.log(header.join(','));
-  console.log(rows.forEach((r)=>{console.log(r.join(','))}))
-}
+  console.log(rows.forEach((r)=>{console.log(r.join(','));}));
+};

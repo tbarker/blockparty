@@ -14,13 +14,13 @@ module.exports = async function() {
   console.log('Changing ownership from ', from, ' to ', to);
   const conference = await setContract(artifacts, 'Conference');
   let owner = await conference.owner.call();
-  console.log('owner', owner, from, owner === from)
+  console.log('owner', owner, from, owner === from);
   if (owner != from) {
     throw('current owner', owner, ' does not match with', from);
   }
-  var result = await conference.transferOwnership(to, {from:from, gasPrice:gas})
+  var result = await conference.transferOwnership(to, {from:from, gasPrice:gas});
   let new_owner = await conference.owner.call();
   if (new_owner != to) {
     throw('new owner', new_owner, ' does not match with', to);
   }
-}
+};

@@ -2,7 +2,7 @@ const participantStatus = function(participant, detail){
   if (!participant.attended && !detail.ended) {
     return 'Registered';
   }else if (detail.cancelled && !participant.paid){
-    return 'Cancelled';  
+    return 'Cancelled';
   }else if (participant.attended && !detail.ended){
     return 'Attended';
   }else if (participant.attended && !participant.paid && detail.ended){
@@ -12,7 +12,7 @@ const participantStatus = function(participant, detail){
   }else if (!participant.attended && detail.ended){
     return 'Lost';
   }else{
-    throw("This should not happen");
+    throw('This should not happen');
   }
-}
+};
 export default participantStatus;

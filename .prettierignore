@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+dist/
+coverage/
+
+# Generated files
+*.min.js
+tmp/
+
+# Lock files
+package-lock.json

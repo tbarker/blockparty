@@ -1,10 +1,10 @@
-const Conference = artifacts.require("Conference.sol");
+const Conference = artifacts.require('Conference.sol');
 const yargs = require('yargs');
 const moment = require('moment');
 let arg = yargs
     .usage('Usage: truffle exec scripts/decrypt.js -i ./tmp/test_private.key -b 0 -c $CONTRACT_ACCOUNT')
     // avoid address to hex conversion
-    .coerce(['c'], function (arg) { return arg})
+    .coerce(['c'], function (arg) { return arg;})
     .demandOption(['i'])
     .argv;
 
@@ -19,7 +19,7 @@ if (arg.b) {
 }
 
 if (arg.c) {
-  contractAccount = arg.c
+  contractAccount = arg.c;
 }
 
 module.exports = async function(callback) {
@@ -42,7 +42,7 @@ module.exports = async function(callback) {
     console.log([registeredAt, result.args.participantName, decrypted.toString('utf8')].join('\t'));
   };
   await awaitEvent(event, watcher);
-}
+};
 
 function awaitEvent(event, handler) {
   return new Promise((resolve, reject) => {

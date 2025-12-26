@@ -1,21 +1,23 @@
 import React from 'react';
-import FloatingActionButton from 'material-ui/FloatingActionButton';
-import TextField from 'material-ui/TextField';
-import RaisedButton from 'material-ui/RaisedButton';
-import Paper from 'material-ui/Paper';
-import SelectField from 'material-ui/SelectField';
-import MenuItem from 'material-ui/MenuItem';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Box from '@mui/material/Box';
 import participantStatus from '../util/participantStatus';
 import cryptoBrowserify from 'crypto-browserify';
 
-const styles = {margin:12}
+const buttonStyle = { margin: '12px' };
 
 class FormInput extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      address:null,
-      name:null,
+      address: '',
+      name: '',
       accounts:[],
       attendees:[],
       participants:[],
@@ -26,25 +28,25 @@ class FormInput extends React.Component {
   componentDidMount(){
     this.props.eventEmitter.on('accounts_received', accounts => {
       this.setState({
-        address:accounts[0],
-        accounts:accounts
-      })
+        address: accounts[0] || '',
+        accounts: accounts
+      });
     });
 
     this.props.eventEmitter.on('participants_updated', participants => {
       this.setState({
         participants:participants
-      })
+      });
     });
 
     this.props.eventEmitter.on('detail', detail => {
       this.setState({detail:detail});
-    })
+    });
 
     this.props.eventEmitter.on('attendees', attendees => {
       this.setState({
         attendees:attendees
-      })
+      });
     });
   }
 
@@ -60,10 +62,13 @@ class FormInput extends React.Component {
       case 'register':
         args.push(this.state.name);
         break;
-      case 'registerWithEncryption':
+      case 'registerWithEncryption': {
         args.push(this.state.name);
-        let encryptedData = cryptoBrowserify.publicEncrypt(this.state.detail.encryption, new Buffer(this.state.full_name, 'utf-8'));
+        const encryptedData = cryptoBrowserify.publicEncrypt(this.state.detail.encryption, Buffer.from(this.state.full_name, 'utf-8'));
         args.push(encryptedData.toString('hex'));
+        break;
+      }
+      default:
         break;
     }
     if(actionName == 'register' || actionName == 'registerWithEncryption'){
@@ -75,28 +80,28 @@ class FormInput extends React.Component {
         provider:web3.currentProvider.constructor.name,
         hostname: window.location.hostname,
         created_at: new Date()
-      }
+      };
       this.props.eventEmitter.emit('logger', obj);
     }
 
-    this.props.action(actionName, this.state.address.trim(), args)
+    this.props.action(actionName, this.state.address.trim(), args);
     this.setState({
-      name: null,
+      name: '',
       attendees:[]
     });
     this.props.eventEmitter.emit('attendees', []);
   }
 
-  handleSelect(event,index,value){
+  handleSelect(event){
     this.setState({
-      address: value,
+      address: event.target.value,
     });
   }
 
   participantStatus(){
     var p = this.selectParticipant(this.state.participants, this.state.address);
     if (p) {
-      return participantStatus(p, this.state.detail)
+      return participantStatus(p, this.state.detail);
     }else{
       return 'Not registered';
     }
@@ -104,8 +109,8 @@ class FormInput extends React.Component {
 
   selectParticipant(participants, address){
     return participants.filter(function(p){
-       return p.address == address
-    })[0]
+       return p.address == address;
+    })[0];
   }
 
   isOwner(){
@@ -121,7 +126,7 @@ class FormInput extends React.Component {
   }
 
   showAttend(){
-    return this.state.detail.canAttend
+    return this.state.detail.canAttend;
   }
 
   showWithdraw(){
@@ -129,15 +134,15 @@ class FormInput extends React.Component {
   }
 
   showPayback(){
-    return this.state.detail.canPayback
+    return this.state.detail.canPayback;
   }
 
   showCancel(){
-    return this.state.detail.canCancel
+    return this.state.detail.canCancel;
   }
 
   showClear(){
-    return this.state.detail.ended
+    return this.state.detail.ended;
   }
 
   handleName(e) {
@@ -156,105 +161,154 @@ class FormInput extends React.Component {
     let adminButtons, registerButton, attendButton, warningText;
 
     if(this.isAdmin()){
-      attendButton = <RaisedButton secondary={this.showAttend()} disabled={!this.showAttend()}
-        label="Batch Attend" style={styles}
-        onClick={this.handleAction.bind(this, 'attend')}
-      />
+      attendButton = (
+        <Button
+          variant="contained"
+          color={this.showAttend() ? 'secondary' : 'inherit'}
+          disabled={!this.showAttend()}
+          style={buttonStyle}
+          onClick={this.handleAction.bind(this, 'attend')}
+        >
+          Batch Attend
+        </Button>
+      );
     }
 
     if(this.isOwner()){
-      adminButtons = <div>
-        <RaisedButton secondary={true}
-          label="Grant admin" style={styles}
-          onClick={this.handleAction.bind(this, 'grant')}
-        />
+      adminButtons = (
+        <Box component="span">
+          <Button
+            variant="contained"
+            color="secondary"
+            style={buttonStyle}
+            onClick={this.handleAction.bind(this, 'grant')}
+          >
+            Grant admin
+          </Button>
 
-        <RaisedButton secondary={this.showPayback()} disabled={!this.showPayback()}
-          label="Payback" style={styles}
-          onClick={this.handleAction.bind(this, 'payback')}
-        />
-        <RaisedButton secondary={this.showCancel()} disabled={!this.showCancel()}
-          label="Cancel" style={styles}
-          onClick={this.handleAction.bind(this, 'cancel')}
-        />
-        <RaisedButton secondary={this.showClear()} disabled={!this.showClear()}
-          label="Clear" style={styles}
-          onClick={this.handleAction.bind(this, 'clear')}
-        />
-      </div>
+          <Button
+            variant="contained"
+            color={this.showPayback() ? 'secondary' : 'inherit'}
+            disabled={!this.showPayback()}
+            style={buttonStyle}
+            onClick={this.handleAction.bind(this, 'payback')}
+          >
+            Payback
+          </Button>
+          <Button
+            variant="contained"
+            color={this.showCancel() ? 'secondary' : 'inherit'}
+            disabled={!this.showCancel()}
+            style={buttonStyle}
+            onClick={this.handleAction.bind(this, 'cancel')}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color={this.showClear() ? 'secondary' : 'inherit'}
+            disabled={!this.showClear()}
+            style={buttonStyle}
+            onClick={this.handleAction.bind(this, 'clear')}
+          >
+            Clear
+          </Button>
+        </Box>
+      );
     }
 
+    let encryptionField = null;
     var availableSpots = this.state.detail.limitOfParticipants - this.state.detail.registered;
     if(this.props.read_only){
-      registerButton = <span>Connect via Mist/Metamask to be able to register.</span>
+      registerButton = <span>Connect via Mist/Metamask to be able to register.</span>;
     }else if(this.state.accounts.length > 0){
       if(this.state.detail.ended){
-        registerButton = <span>This event is over </span>
+        registerButton = <span>This event is over </span>;
       }else if (availableSpots <= 0){
-        registerButton = <span>No more spots left</span>
+        registerButton = <span>No more spots left</span>;
       }else{
+        let actionName = 'register';
         if (this.state.detail.encryption && this.showRegister()) {
-          var encryptionField =  <TextField
-                      floatingLabelText="Full name * (to be encrypted)"
-                      floatingLabelFixed={true}
-                      value={this.state.full_name}
-                      hintText="Full name (required)"
-                      onChange={this.handleEncryptedField.bind(this)}
-                      style={{margin:'0 5px'}}
-          />
-          var action = 'registerWithEncryption';
-        }else{
-          var action = 'register';
+          encryptionField = (
+            <TextField
+              label="Full name * (to be encrypted)"
+              placeholder="Full name (required)"
+              value={this.state.full_name || ''}
+              onChange={this.handleEncryptedField.bind(this)}
+              variant="outlined"
+              size="small"
+              sx={{ margin: '0 5px' }}
+            />
+          );
+          actionName = 'registerWithEncryption';
         }
-        registerButton = <RaisedButton secondary={this.showRegister()} disabled={!this.showRegister()}
-          label="RSVP" style={styles}
-          onClick={this.handleAction.bind(this, action)}
-        />
-        warningText = <div style={{textAlign:'center', color:'red'}}>Please be aware that you <strong>cannot</strong> cancel once regiesterd. Please read FAQ section at ABOUT page on top right corner for more detail about this service.</div>
+        registerButton = (
+          <Button
+            variant="contained"
+            color={this.showRegister() ? 'secondary' : 'inherit'}
+            disabled={!this.showRegister()}
+            style={buttonStyle}
+            onClick={this.handleAction.bind(this, actionName)}
+          >
+            RSVP
+          </Button>
+        );
+        warningText = <Box sx={{textAlign:'center', color:'red'}}>Please be aware that you <strong>cannot</strong> cancel once regiesterd. Please read FAQ section at ABOUT page on top right corner for more detail about this service.</Box>;
       }
     }else{
-      registerButton = <span>No account is set</span>
+      registerButton = <span>No account is set</span>;
     }
 
-    var withdrawButton = <RaisedButton secondary={this.showWithdraw()} disabled={!this.showWithdraw()}
-      label="Withdraw" style={styles}
-      onClick={this.handleAction.bind(this, 'withdraw')}
-    />
+    var withdrawButton = (
+      <Button
+        variant="contained"
+        color={this.showWithdraw() ? 'secondary' : 'inherit'}
+        disabled={!this.showWithdraw()}
+        style={buttonStyle}
+        onClick={this.handleAction.bind(this, 'withdraw')}
+      >
+        Withdraw
+      </Button>
+    );
 
+    let nameField = null;
     if (this.showRegister()) {
-      var nameField = <TextField
-        hintText="@twitter_handle (required)"
-        floatingLabelText="Twitter handle *"
-        floatingLabelFixed={true}
-        value={this.state.name}
-        onChange={this.handleName.bind(this)}
-        style={{margin:'0 5px'}}
-      />
+      nameField = (
+        <TextField
+          placeholder="@twitter_handle (required)"
+          label="Twitter handle *"
+          value={this.state.name || ''}
+          onChange={this.handleName.bind(this)}
+          variant="outlined"
+          size="small"
+          sx={{ margin: '0 5px' }}
+        />
+      );
     }
 
     return (
-      <Paper zDepth={1}>
-        <form>
+      <Paper elevation={1} sx={{ padding: 2 }}>
+        <Box component="form" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
           {encryptionField}
           {nameField}
-          <SelectField
-            value={this.state.address}
-            onChange={this.handleSelect.bind(this)}
-            floatingLabelText="Account address"
-            floatingLabelFixed={true}
-            style={{width:'25em', verticalAlign:'top', margin:'0 5px'}}
+          <FormControl sx={{ minWidth: '25em', margin: '0 5px' }} size="small">
+            <InputLabel id="account-select-label">Account address</InputLabel>
+            <Select
+              labelId="account-select-label"
+              value={this.state.address || ''}
+              onChange={this.handleSelect.bind(this)}
+              label="Account address"
             >
-            {
-              this.state.accounts.map(account => {
-                return (<MenuItem value={account} primaryText={account} />)
-              })
-            }
-          </SelectField>
+              {this.state.accounts.map((account, index) => (
+                <MenuItem key={index} value={account}>{account}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           {registerButton}
           {withdrawButton}
           {attendButton}
           {adminButtons}
-        </form>
+        </Box>
         {warningText}
       </Paper>
     );

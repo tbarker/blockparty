@@ -10,8 +10,8 @@ module.exports = function() {
   let uuids = [];
   for (var i = 0; i < arg.n; i++) {
     var code = uuidV4();
-    console.log(code)
+    console.log(code);
     uuids.push();
   }
   fs.writeFileSync(arg.o, uuids.join('\n'));
-}
+};

@@ -64,13 +64,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
+      - name: Install Forge dependencies
+        run: forge install foundry-rs/forge-std --no-git
 
       - name: Run Forge build
         run: forge build
@@ -90,13 +91,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
+      - name: Install Forge dependencies
+        run: forge install foundry-rs/forge-std --no-git
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -126,13 +128,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
+      - name: Install Forge dependencies
+        run: forge install foundry-rs/forge-std --no-git
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -151,8 +154,15 @@ jobs:
 
       - name: Start Anvil
         run: |
-          anvil --chain-id 1337 &
-          sleep 3
+          # Start Anvil bound to all interfaces to ensure browser can reach it
+          anvil --host 0.0.0.0 --chain-id 1337 &
+          sleep 5
+          # Verify Anvil is running and accessible
+          echo "Verifying Anvil is running..."
+          curl -sf -X POST http://127.0.0.1:8545 -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+            && echo "Anvil is ready!" \
+            || (echo "ERROR: Anvil is not responding!" && exit 1)
 
       - name: Run E2E tests
         run: npm run test:e2e
@@ -170,23 +180,28 @@ jobs:
   build:
     name: Build Check
     runs-on: ubuntu-latest
-    container:
-      image: node:22-bookworm
     needs: [lint, react-ui, smart-contracts, integration, e2e]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
 
+      - name: Install Forge dependencies
+        run: forge install foundry-rs/forge-std --no-git
+
       - name: Build contracts
         run: forge build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install npm dependencies
         run: npm ci
@@ -211,6 +226,7 @@ jobs:
         with:
           context: .
           push: false
+          load: true
           tags: blockparty:test
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -4,7 +4,8 @@
  * This script is injected into the browser to simulate MetaMask.
  * It uses Anvil's pre-funded test accounts and forwards transactions to Anvil.
  *
- * Enhanced with @depay/web3-mock patterns for comprehensive wallet mocking.
+ * Unlike @depay/web3-mock which mocks responses, this provider forwards
+ * real transactions to a local Anvil instance for true integration testing.
  *
  * Usage: page.addInitScript({ path: 'mockEthereum.js' })
  */
@@ -37,6 +38,7 @@ const getConfig = () => {
     typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('__e2e_active_account__') : null;
 
   return {
+    // Use 127.0.0.1 to avoid IPv6 resolution issues with 'localhost'
     rpcUrl: window.__E2E_CONFIG__?.rpcUrl || 'http://127.0.0.1:8545',
     chainId: window.__E2E_CONFIG__?.chainId || 1337,
     activeAccount: persistedAccount || window.__E2E_CONFIG__?.activeAccount || 'user1',

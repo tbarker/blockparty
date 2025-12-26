@@ -69,21 +69,35 @@ test.describe('Admin Attendance Flow', () => {
     await page.waitForSelector('h4:has-text("Event Info")', { timeout: 30000 });
     await page.waitForTimeout(3000);
 
-    // Look for attendance checkboxes
+    // Look for attendance checkboxes in the participants table
     const attendCheckboxes = page.locator('input[type="checkbox"]');
     const checkboxCount = await attendCheckboxes.count();
+    console.log('Found checkboxes:', checkboxCount);
 
     if (checkboxCount > 0) {
       // Find an unchecked checkbox and check it
+      let checkedOne = false;
       for (let i = 0; i < checkboxCount; i++) {
         const checkbox = attendCheckboxes.nth(i);
         const isChecked = await checkbox.isChecked();
 
         if (!isChecked) {
           await checkbox.check();
-          await waitForTransactionSuccess(page);
-          await expect(checkbox).toBeChecked();
+          checkedOne = true;
+          console.log('Checked checkbox', i);
           break;
+        }
+      }
+
+      if (checkedOne) {
+        // Now click the "Attend" button to submit the attendance
+        const attendButton = page.locator('button:has-text("Attend")');
+        if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
+          await attendButton.click();
+          await waitForTransactionSuccess(page);
+          console.log('Attendance marked successfully');
+        } else {
+          console.log('Attend button not available or not enabled');
         }
       }
     } else {

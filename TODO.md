@@ -56,13 +56,38 @@ This document tracks upgrades deferred to maintain stability.
 - Uses snapshot/revert for test isolation
 - Tests contract interactions directly without browser
 
-## Deferred
+## Completed
 
 ### React 19 Migration
 
-**Status:** Unblocked - react-notifications replaced with MUI Snackbar/Alert
+**Status:** Complete
 
-**Remaining work:** Update to React 19 and @testing-library/react 16
+- Replaced react-notifications with MUI Snackbar/Alert (removed findDOMNode deprecation)
+- Upgraded React 18.3.1 -> 19.x
+- Upgraded react-dom 18.3.1 -> 19.x
+- Upgraded @testing-library/react 14.x -> 16.x
+
+## Deferred
+
+### Synpress for E2E Wallet Testing
+
+**Current:** Custom `mockEthereum.js` that simulates MetaMask and forwards RPC to Anvil
+**Alternative:** Synpress (`@synthetixio/synpress`) - E2E framework with real MetaMask automation
+
+**Why deferred:**
+
+- Current custom approach is simpler and faster (no extension overhead)
+- Synpress requires Xvfb/display server in CI for browser extensions
+- May have Docker/devcontainer compatibility issues
+- Custom mock is working and sufficient for current needs
+
+**Revisit if:**
+
+- Need to test actual MetaMask-specific behaviors (signing UX, network switching prompts)
+- Custom mock becomes a maintenance burden
+- Synpress improves headless/container support
+
+**Note:** `@depay/web3-mock` was evaluated but is not suitable - it mocks RPC responses entirely rather than forwarding to a real blockchain.
 
 ### TypeScript Migration
 
@@ -83,6 +108,19 @@ This document tracks upgrades deferred to maintain stability.
 - Add E2E tests with Playwright
 - Target >80% coverage
 
+### E2E Tests (Playwright)
+
+**Status:** Complete
+
+- Implemented E2E tests using Playwright + custom wallet mock
+- Test files in `src/__tests__/e2e/`:
+  - `registration.spec.mjs` - User registration flow
+  - `attendance.spec.mjs` - Admin attendance marking
+  - `withdrawal.spec.mjs` - Withdrawal after event ends
+- Custom `mockEthereum.js` simulates MetaMask, forwards transactions to Anvil
+- Run with `npm run test:e2e`
+- All 14 tests passing in CI
+
 #### Future Testing Improvements
 
 1. **ENS Integration Tests**
@@ -90,14 +128,9 @@ This document tracks upgrades deferred to maintain stability.
    - Register names
    - Verify reverse resolution works in UI
 
-2. **Browser E2E Tests**
-   - Use Playwright with wallet mocking
-   - Full UI interaction testing
-   - Visual regression testing
-
-3. **CI Integration**
-   - Run integration tests in GitHub Actions
-   - Start/stop Anvil automatically
+2. **Visual Regression Testing**
+   - Add Playwright visual comparison tests
+   - Catch unintended UI changes
 
 ### Code Quality
 

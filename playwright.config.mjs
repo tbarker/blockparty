@@ -1,7 +1,8 @@
 /**
  * Playwright Configuration for BlockParty E2E Tests
  *
- * Uses @depay/web3-mock for wallet mocking - no real MetaMask extension needed.
+ * Uses a custom mock Ethereum provider that forwards transactions to Anvil.
+ * No real MetaMask extension needed - wallet interactions are simulated.
  * Tests run against a local Anvil blockchain with pre-funded test accounts.
  *
  * @see https://playwright.dev/docs/test-configuration

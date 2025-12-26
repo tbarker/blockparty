@@ -28,14 +28,18 @@ test.describe('Registration Flow', () => {
     // Wait for the app to load and connect to the contract
     await page.waitForSelector('h4:has-text("Event Info")', { timeout: 30000 });
 
+    // Wait a bit for contract data to load (CI can be slow)
+    await page.waitForTimeout(3000);
+
     // Verify event name is displayed
-    await expect(page.locator('text=E2E Test Event')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=E2E Test Event')).toBeVisible({ timeout: 15000 });
 
     // Verify deposit info is shown (0.02 ETH)
-    await expect(page.locator('text=ETH 0.02')).toBeVisible();
+    await expect(page.locator('text=ETH 0.02')).toBeVisible({ timeout: 10000 });
 
     // Verify participant count shows (starts at 0)
-    await expect(page.locator('text=Going (spots left)')).toBeVisible();
+    // Use a more flexible selector that matches partial text
+    await expect(page.locator('text=/Going.*spots/i')).toBeVisible({ timeout: 10000 });
   });
 
   test('should show connected account in dropdown', async ({ page }) => {

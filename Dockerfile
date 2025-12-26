@@ -31,8 +31,9 @@ RUN npm install
 # Copy the rest of the application
 COPY . .
 
-# Install Forge dependencies
-RUN forge install --no-git || true
+# Install Forge dependencies (forge-std for testing framework)
+# Remove empty submodule directory first, then install
+RUN rm -rf lib/forge-std && forge install foundry-rs/forge-std --no-git
 
 # Build contracts
 RUN forge build

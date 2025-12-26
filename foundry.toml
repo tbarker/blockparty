@@ -1,0 +1,39 @@
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+
+# Compiler settings
+solc = "0.8.20"
+optimizer = true
+optimizer_runs = 200
+evm_version = "paris"
+
+# Test settings
+ffi = false
+verbosity = 2
+fuzz = { runs = 256 }
+
+# Gas reporting
+gas_reports = ["Conference", "GroupAdmin"]
+
+# Remappings
+remappings = [
+    "forge-std/=lib/forge-std/src/",
+]
+
+[profile.ci]
+fuzz = { runs = 10000 }
+verbosity = 4
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+
+# RPC endpoints for deployment
+# Note: Use 'anvil --chain-id 1337' to avoid conflict with Go testnet (which uses 31337)
+[rpc_endpoints]
+localhost = "http://127.0.0.1:8545"

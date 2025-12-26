@@ -8,6 +8,10 @@ yarn-error.log
 .vscode/*
 .node*
 archive/*
+lib/
+broadcast/
+cache/
+out/
 coverage
 coverageEnv
 coverage.json

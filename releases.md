@@ -1,3 +1,28 @@
+## v1.0
+
+Major infrastructure modernization release.
+
+### Smart Contract Tooling
+
+- Migrate from Truffle to Foundry/Forge
+- All contract tests rewritten in Solidity (46 tests)
+- Add Forge deployment scripts (`script/Deploy.s.sol`)
+- Use Anvil for local development (replaces Ganache)
+
+### Frontend
+
+- Migrate from web3.js to ethers.js v6
+- Use native ethers.js ENS support
+- Remove jQuery dependency
+- Load contract ABIs from Forge output (`out/`)
+
+### Removed
+
+- Truffle configuration and migrations
+- JavaScript contract tests (replaced by Solidity tests)
+- web3.js and @truffle/contract dependencies
+- Ganache (use Anvil instead)
+
 ## v0.9
 
 - Upgrade to Solidity 0.8.20

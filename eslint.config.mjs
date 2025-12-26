@@ -6,7 +6,7 @@ import globals from 'globals';
 export default [
   // Base recommended config
   js.configs.recommended,
-  
+
   // React plugin config
   {
     plugins: {
@@ -18,7 +18,7 @@ export default [
       },
     },
   },
-  
+
   // Main config for JS/JSX files
   {
     files: ['**/*.js', '**/*.jsx'],
@@ -40,13 +40,8 @@ export default [
         ...globals.node,
         ...globals.jest,
         ...globals.mocha,
-        // Truffle/Web3 globals
-        web3: 'readonly',
-        artifacts: 'readonly',
-        contract: 'readonly',
+        // Test globals
         assert: 'readonly',
-        // jQuery
-        $: 'readonly',
         // Node.js
         Buffer: 'readonly',
       },
@@ -66,9 +61,9 @@ export default [
       'react/jsx-no-duplicate-props': 'error',
 
       // Code style (relaxed for legacy code)
-      'semi': ['error', 'always'],
-      'quotes': ['warn', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
-      'indent': 'off', // Don't enforce indentation in legacy code
+      semi: ['error', 'always'],
+      quotes: ['warn', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
+      indent: 'off', // Don't enforce indentation in legacy code
       'comma-dangle': ['warn', 'only-multiline'],
       'no-trailing-spaces': 'warn',
       'eol-last': ['warn', 'always'],
@@ -80,7 +75,7 @@ export default [
       'no-useless-escape': 'warn',
     },
   },
-  
+
   // Test files overrides
   {
     files: ['**/*.test.js', '**/__tests__/**/*.js', 'test/**/*.js'],
@@ -88,23 +83,7 @@ export default [
       'no-unused-vars': 'off',
     },
   },
-  
-  // Migration files overrides
-  {
-    files: ['migrations/**/*.js'],
-    rules: {
-      'no-undef': 'off', // Truffle injects globals
-    },
-  },
-  
-  // Script files overrides
-  {
-    files: ['scripts/**/*.js'],
-    rules: {
-      'no-undef': 'off',
-    },
-  },
-  
+
   // Ignore patterns (replaces .eslintignore)
   {
     ignores: [
@@ -120,9 +99,11 @@ export default [
       // Config files
       'webpack.config.js',
       'jest.config.js',
-      'truffle-config.js',
       // Contracts (handled by Solhint)
       'contracts/**',
+      // Foundry
+      'lib/**',
+      'out/**',
     ],
   },
 ];

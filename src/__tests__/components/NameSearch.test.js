@@ -51,7 +51,7 @@ describe('NameSearch', () => {
     );
 
     const input = container.querySelector('input');
-    
+
     await act(async () => {
       fireEvent.change(input, { target: { value: 'test' } });
     });
@@ -104,7 +104,7 @@ describe('NameSearch', () => {
     );
 
     const input = container.querySelector('input');
-    
+
     await act(async () => {
       fireEvent.change(input, { target: { value: '@user_123' } });
     });

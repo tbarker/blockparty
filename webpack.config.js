@@ -10,11 +10,7 @@ module.exports = {
     filename: 'app.js',
   },
   plugins: [
-    // Copy our app's index.html to the build folder.
-    new CopyWebpackPlugin({
-      patterns: [{ from: './public/index.html', to: 'index.html' }],
-    }),
-    // Provide polyfills for Node.js core modules (required by Web3)
+    // Provide polyfills for Node.js core modules (required by ethers.js)
     new webpack.ProvidePlugin({
       Buffer: ['buffer', 'Buffer'],
       process: 'process/browser',
@@ -22,10 +18,16 @@ module.exports = {
     // Expose environment variables to the frontend
     new webpack.DefinePlugin({
       'process.env.ENS_ADDRESS': JSON.stringify(process.env.ENS_ADDRESS),
+      'process.env.CONTRACT_ADDRESS': JSON.stringify(process.env.CONTRACT_ADDRESS),
+    }),
+    // Generate index.html with injected script tags
+    new HtmlWebpackPlugin({
+      template: './public/index.html',
+      inject: true,
     }),
   ],
   resolve: {
-    // Polyfills for Node.js core modules used by Web3 and @truffle/contract
+    // Polyfills for Node.js core modules used by ethers.js
     fallback: {
       crypto: require.resolve('crypto-browserify'),
       stream: require.resolve('stream-browserify'),
@@ -44,7 +46,7 @@ module.exports = {
     },
     extensions: ['.js', '.jsx', '.json'],
   },
-  // Ignore critical dependency warnings from ethers.js (bundled in @truffle/contract)
+  // Ignore critical dependency warnings from ethers.js
   // These are false positives from dynamic require() in minified code
   ignoreWarnings: [
     {

@@ -13,6 +13,14 @@ source /home/node/.bashrc 2>/dev/null || true
 echo "Installing npm dependencies..."
 npm install
 
+# Install Forge dependencies (forge-std)
+echo "Installing Forge dependencies..."
+forge install --no-git 2>/dev/null || echo "Forge dependencies already installed"
+
+# Build contracts
+echo "Building contracts..."
+forge build
+
 # Copy test keys to project tmp directory if they don't exist
 echo "Setting up test encryption keys..."
 mkdir -p tmp
@@ -25,13 +33,19 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Available commands:"
-echo "  npm run dev          - Start webpack dev server (http://localhost:8080)"
-echo "  npm run test:ui      - Run React component tests"
-echo "  npm run lint         - Run ESLint and Solhint"
-echo "  anvil                - Start local Ethereum node (Foundry)"
-echo "  forge test           - Run Solidity tests with Foundry"
+echo "  npm run dev              - Start webpack dev server (http://localhost:8080)"
+echo "  npm run test:ui          - Run React component tests"
+echo "  npm run lint             - Run ESLint and Solhint"
 echo ""
-echo "For smart contract tests with Truffle (legacy):"
-echo "  npx ganache &        - Start Ganache in background"
-echo "  npm run test         - Run Truffle tests"
+echo "Smart contract development (Foundry):"
+echo "  anvil                    - Start local Ethereum node"
+echo "  forge test               - Run Solidity tests"
+echo "  forge test -vvv          - Run tests with verbose output"
+echo "  forge build              - Compile contracts"
+echo "  forge coverage           - Generate coverage report"
+echo ""
+echo "Deployment:"
+echo "  npm run deploy:local     - Deploy to local Anvil node"
+echo "  # Or manually:"
+echo "  forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545"
 echo ""

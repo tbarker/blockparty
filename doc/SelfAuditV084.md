@@ -1,5 +1,7 @@
 # BlockParty version 0.8.4 pre auditing guide.
 
+> **Note**: This is a historical document from 2018. The contract has since been upgraded to Solidity 0.8.20 and the tooling has changed significantly (Truffle -> Foundry, web3.js -> ethers.js). Some of the tools and vulnerabilities mentioned may no longer apply.
+
 This is a self-audit result of version [0.8.4](https://github.com/makoto/blockparty/releases/tag/v0.8.4).
 
 - Chapter 1: About this contract
@@ -18,32 +20,32 @@ BlockParty is an event management smart contract. You pay a small deposit when y
 ### Contract structures and function names
 
 ```
-$ surya describe  contracts/Conference.sol 
+$ surya describe  contracts/Conference.sol
  +  Conference (Destructible, GroupAdmin)
-    - [Pub] <fallback> 
+    - [Pub] <fallback>
     - [Ext] registerWithEncryption ($)
     - [Ext] register ($)
-    - [Int] registerInternal 
-    - [Ext] withdraw 
-    - [Pub] totalBalance 
-    - [Pub] isRegistered 
-    - [Pub] isAttended 
-    - [Pub] isPaid 
-    - [Pub] payout 
-    - [Ext] payback 
-    - [Ext] cancel 
-    - [Ext] clear 
-    - [Ext] setLimitOfParticipants 
-    - [Ext] changeName 
-    - [Ext] attend 
+    - [Int] registerInternal
+    - [Ext] withdraw
+    - [Pub] totalBalance
+    - [Pub] isRegistered
+    - [Pub] isAttended
+    - [Pub] isPaid
+    - [Pub] payout
+    - [Ext] payback
+    - [Ext] cancel
+    - [Ext] clear
+    - [Ext] setLimitOfParticipants
+    - [Ext] changeName
+    - [Ext] attend
 
-$ surya describe  contracts/GroupAdmin.sol 
+$ surya describe  contracts/GroupAdmin.sol
  +  GroupAdmin (Ownable)
-    - [Pub] grant 
-    - [Pub] revoke 
-    - [Pub] getAdmins 
-    - [Pub] numOfAdmins 
-    - [Pub] isAdmin 
+    - [Pub] grant
+    - [Pub] revoke
+    - [Pub] getAdmins
+    - [Pub] numOfAdmins
+    - [Pub] isAdmin
 ```
 
 And this is the dependency graph
@@ -109,14 +111,14 @@ The three major vulnerabilities are described in this chapter.
 - Summary: a malicious contract can re-enter
 - Cause: Changing a state after transferring funds
 - When: 2017 Feb
-- How it was found?:  [Daniele Carmelitti](https://github.com/danielitti) spotted while Makoto was showing the code at CodeUp.
+- How it was found?: [Daniele Carmelitti](https://github.com/danielitti) spotted while Makoto was showing the code at CodeUp.
 
 ### [Cancel and gone](https://github.com/makoto/blockparty/issues/81)
 
 - Summary: Anyone can withdraw if the event is canceled
 - Cause: Invalid condition after refactoring
 - When: 2017 Sep
-- How it was found?:  [Will Harborne](https://twitter.com/will_harborne) raised the vulnerability issue after chatting with Makoto at a pub.
+- How it was found?: [Will Harborne](https://twitter.com/will_harborne) raised the vulnerability issue after chatting with Makoto at a pub.
 
 ## Static analysis
 
@@ -133,7 +135,7 @@ The followings are the quick checklist.
 ### Static analysis using off the shelf tools and services.
 
 - Securify.ch = No error was reported.
-- SmartCheck  = No error was reported. The full report is [here](https://tool.smartdec.net/scan/a51c4105dd0548d98495da1bac37dffa).
+- SmartCheck = No error was reported. The full report is [here](https://tool.smartdec.net/scan/a51c4105dd0548d98495da1bac37dffa).
 - Oyente = The latest solc supported version is 0.4.17 hence could not test.
 - [mythril](https://github.com/ConsenSys/mythril) = The current version (0.18.6) seems to support only sol 0.4.23. Temporarily downgraded to the `0.4.23` and tried it manually. The full log is [here](https://gist.github.com/makoto/62542bafe6e4e19bdee7070acf56a1f0). There are a lot of duplicate errors against undecrypted functions (eg: `_function_0x05f203d9`) which make it hard to point to the exact location of the vulnerabilities. The followings are the notable warnings.
 
@@ -188,7 +190,6 @@ It is very difficult to audit my own code as I have seen it many many times. I c
 
 - line 38: The owner can be transferred into wrong address or empty address by mistake = Tracked [here](https://github.com/makoto/blockparty/issues/162)
 
-
 ### Potential Logical flaws
 
 #### Twitter account can be faked
@@ -201,7 +202,7 @@ This is a feature to close the event registration.
 
 #### Event owner can cheat.
 
-Currently, a contract owner has strong power to mark who attended and who did not attend. It is possible for event owners not to mark certain users who he/she does not like. For this reason, the creation of event is currently not open to everyone (unless someone downloads the project from GitHub and deploys on their own [which has been done in the past](https://blockparty.polynom.com/) but with the help of the author). 
+Currently, a contract owner has strong power to mark who attended and who did not attend. It is possible for event owners not to mark certain users who he/she does not like. For this reason, the creation of event is currently not open to everyone (unless someone downloads the project from GitHub and deploys on their own [which has been done in the past](https://blockparty.polynom.com/) but with the help of the author).
 
 #### Participants may try to deceive other participants to increase the payout
 

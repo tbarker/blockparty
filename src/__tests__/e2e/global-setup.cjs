@@ -12,8 +12,8 @@ const path = require('path');
 const fs = require('fs');
 
 const ANVIL_PORT = 8545;
-// Use 127.0.0.1 instead of localhost to avoid IPv6 issues
-// Node.js fetch may resolve localhost to ::1 (IPv6) but Anvil listens on 0.0.0.0 (IPv4)
+// URL for both Node.js and browser to connect to Anvil
+// Using 127.0.0.1 to avoid DNS resolution issues in containers
 const ANVIL_URL = `http://127.0.0.1:${ANVIL_PORT}`;
 const STATE_FILE = path.join(__dirname, '.e2e-state.json');
 
@@ -123,6 +123,26 @@ async function deployContract() {
   const contractAddress = await contract.getAddress();
 
   console.log(`[E2E Setup] Contract deployed at: ${contractAddress}`);
+
+  // Verify the contract was actually deployed by checking its code
+  const code = await provider.getCode(contractAddress);
+  if (code === '0x' || code === '0x0' || !code) {
+    throw new Error(
+      `Contract deployment verification failed! No code at ${contractAddress}. ` +
+        'The deployment transaction may have succeeded but the contract was not created.'
+    );
+  }
+  console.log(`[E2E Setup] Contract verified (code length: ${code.length} chars)`);
+
+  // Verify the contract is callable by reading its name
+  const deployedContract = new ethers.Contract(contractAddress, abi, provider);
+  const name = await deployedContract.name();
+  if (name !== 'E2E Test Event') {
+    throw new Error(
+      `Contract functional verification failed! Expected name "E2E Test Event" but got "${name}"`
+    );
+  }
+  console.log(`[E2E Setup] Contract functional test passed (name: ${name})`);
 
   return contractAddress;
 }

@@ -38,7 +38,7 @@ const getConfig = () => {
     typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('__e2e_active_account__') : null;
 
   return {
-    // Use 127.0.0.1 to avoid IPv6 resolution issues with 'localhost'
+    // Use 127.0.0.1 to avoid DNS resolution issues in containers
     rpcUrl: window.__E2E_CONFIG__?.rpcUrl || 'http://127.0.0.1:8545',
     chainId: window.__E2E_CONFIG__?.chainId || 1337,
     activeAccount: persistedAccount || window.__E2E_CONFIG__?.activeAccount || 'user1',
@@ -397,31 +397,50 @@ function createMockEthereum() {
   }
 
   /**
-   * Forward RPC calls to Anvil
+   * Forward RPC calls to Anvil with retry logic for container environments
    */
-  async function forwardToRpc(method, params) {
+  async function forwardToRpc(method, params, retries = 3) {
     const config = getConfig();
 
-    const response = await fetch(config.rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method,
-        params: params || [],
-        id: Date.now(),
-      }),
-    });
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(config.rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method,
+            params: params || [],
+            id: Date.now(),
+          }),
+        });
 
-    const result = await response.json();
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
 
-    if (result.error) {
-      const error = new Error(result.error.message);
-      error.code = result.error.code;
-      throw error;
+        const result = await response.json();
+
+        if (result.error) {
+          const error = new Error(result.error.message);
+          error.code = result.error.code;
+          throw error;
+        }
+
+        return result.result;
+      } catch (error) {
+        const isLastAttempt = attempt === retries;
+        if (isLastAttempt) {
+          console.error(
+            `[MockEthereum] ${method} failed after ${retries} attempts:`,
+            error.message
+          );
+          throw new Error(`Failed to call ${method} on Anvil: ${error.message}`);
+        }
+        // Wait before retrying (exponential backoff: 50ms, 100ms, 200ms)
+        await new Promise(resolve => setTimeout(resolve, 50 * Math.pow(2, attempt - 1)));
+      }
     }
-
-    return result.result;
   }
 
   return mockEthereum;

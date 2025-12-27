@@ -45,6 +45,45 @@ function loadState() {
 }
 
 /**
+ * Verify the contract is accessible via Anvil RPC
+ */
+async function verifyContractAccessible(state, maxAttempts = 5) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(state.anvilUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_getCode',
+          params: [state.contractAddress, 'latest'],
+          id: Date.now(),
+        }),
+      });
+      const result = await response.json();
+      if (result.result && result.result !== '0x' && result.result.length > 10) {
+        console.log(
+          `[E2E Fixtures] Contract verified at ${state.contractAddress} (attempt ${attempt})`
+        );
+        return true;
+      }
+      console.log(
+        `[E2E Fixtures] Contract not found at ${state.contractAddress}, attempt ${attempt}/${maxAttempts}`
+      );
+    } catch (error) {
+      console.log(`[E2E Fixtures] RPC error on attempt ${attempt}/${maxAttempts}:`, error.message);
+    }
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  throw new Error(
+    `Contract not accessible at ${state.contractAddress} after ${maxAttempts} attempts. ` +
+      'Anvil may have been reset or the contract deployment failed.'
+  );
+}
+
+/**
  * Extended test fixtures with blockchain support
  */
 export const test = base.extend({
@@ -53,6 +92,8 @@ export const test = base.extend({
    */
   e2eState: async ({}, use) => {
     const state = loadState();
+    // Verify contract is actually accessible before running tests
+    await verifyContractAccessible(state);
     await use(state);
   },
 
@@ -76,6 +117,14 @@ export const test = base.extend({
     // Log page errors
     page.on('pageerror', err => {
       console.log('[Page Error]', err.message);
+    });
+
+    // Log the config we're about to inject (for debugging)
+    console.log('[E2E Fixtures] Injecting config:', {
+      anvilUrl: e2eState.anvilUrl,
+      contractAddress: e2eState.contractAddress,
+      chainId: e2eState.chainId,
+      initialAccount,
     });
 
     // Inject configuration before the mock script

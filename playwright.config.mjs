@@ -59,6 +59,16 @@ export default defineConfig({
         browserName: 'chromium',
         // Default to headless mode - use --headed flag or test:e2e:headed script for visible browser
         headless: true,
+        // Chromium args for container environment
+        launchOptions: {
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            // Disable DNS prefetching which can cause issues in containers
+            '--dns-prefetch-disable',
+          ],
+        },
       },
     },
   ],

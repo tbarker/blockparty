@@ -5,6 +5,7 @@ FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
 
 # Install system dependencies for native module compilation and Ethereum development
 # Also includes dependencies required by Playwright for E2E testing
+# And xvfb for Synpress headful browser testing
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -28,6 +29,18 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libpango-1.0-0 \
     libcairo2 \
+    # Synpress/MetaMask E2E testing requires headful browser
+    # xvfb provides virtual X display for headful Chrome in containers
+    xvfb \
+    # Additional X11 libraries for headful browser rendering
+    libx11-xcb1 \
+    libxcb1 \
+    libxext6 \
+    libxrender1 \
+    libxi6 \
+    libxtst6 \
+    libxss1 \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up workspace directory

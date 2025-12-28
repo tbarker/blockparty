@@ -1,24 +1,21 @@
 /**
- * Playwright Configuration for BlockParty E2E Tests
+ * Playwright Configuration for Synpress E2E Tests
  *
- * Uses a custom mock Ethereum provider that forwards transactions to Anvil.
- * No real MetaMask extension needed - wallet interactions are simulated.
- * Tests run against a local Anvil blockchain with pre-funded test accounts.
+ * Uses real MetaMask extension for wallet interactions.
+ * Runs headful with xvfb in containers (devcontainer and CI).
  *
- * @see https://playwright.dev/docs/test-configuration
+ * Self-contained: Anvil is started and contract deployed in globalSetup,
+ * and cleaned up in globalTeardown.
+ *
+ * @see https://docs.synpress.io/docs/setup-playwright
  */
 
-import { defineConfig } from '@playwright/test';
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './src/__tests__/e2e',
+  testDir: './src/__tests__/e2e-synpress',
 
-  // Run tests sequentially - we're sharing blockchain state
+  // Run tests sequentially - sharing blockchain state
   fullyParallel: false,
   workers: 1,
 
@@ -44,28 +41,29 @@ export default defineConfig({
   },
 
   // Test timeout (blockchain transactions can be slow)
-  timeout: 60000,
+  timeout: 240000,
 
   // Expect timeout for assertions
   expect: {
-    timeout: 10000,
+    timeout: 30000,
   },
 
-  // Configure projects - Chrome only
+  // Configure projects - Chrome only (MetaMask only works on Chrome)
   projects: [
     {
       name: 'chromium',
       use: {
-        browserName: 'chromium',
-        // Default to headless mode - use --headed flag or test:e2e:headed script for visible browser
-        headless: true,
-        // Chromium args for container environment
+        ...devices['Desktop Chrome'],
+        // Synpress requires headful mode for MetaMask extension
+        headless: false,
+        // Chromium args for container environment with xvfb
         launchOptions: {
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            // Disable DNS prefetching which can cause issues in containers
+            '--disable-gpu',
+            // Reduce flakiness in containers
             '--dns-prefetch-disable',
           ],
         },
@@ -83,7 +81,7 @@ export default defineConfig({
     stderr: 'pipe',
   },
 
-  // Global setup/teardown for Anvil blockchain
-  globalSetup: path.resolve(__dirname, './src/__tests__/e2e/global-setup.cjs'),
-  globalTeardown: path.resolve(__dirname, './src/__tests__/e2e/global-teardown.cjs'),
+  // Global setup/teardown for Anvil blockchain and contract deployment
+  globalSetup: './src/__tests__/e2e-synpress/global-setup.cjs',
+  globalTeardown: './src/__tests__/e2e-synpress/global-teardown.cjs',
 });

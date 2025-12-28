@@ -22,8 +22,10 @@ ENV PATH="/root/.foundry/bin:${PATH}"
 
 WORKDIR /app
 
-# Copy package files first for better caching
+# Copy package files and scripts first for better caching
+# (scripts/ needed for postinstall hook)
 COPY package.json package-lock.json* ./
+COPY scripts/ ./scripts/
 
 # Install npm dependencies
 RUN npm install

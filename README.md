@@ -117,7 +117,7 @@ The project has four levels of testing:
 1. **Smart Contract Tests** (Forge/Solidity) - Unit tests for the Solidity contracts
 2. **UI Component Tests** (Jest/React Testing Library) - Unit tests for React components
 3. **Integration Tests** (Jest/Anvil) - Tests contract interactions from JavaScript
-4. **E2E Tests** (Playwright) - Full browser tests with mocked wallet
+4. **E2E Tests** (Synpress/Playwright) - Full browser tests with real MetaMask extension
 
 ```bash
 # Smart contract tests (Forge)
@@ -134,9 +134,9 @@ npm run test:build
 npm run anvil             # In terminal 1
 npm run test:integration  # In terminal 2
 
-# E2E browser tests (Playwright - starts Anvil automatically)
-npm run test:e2e          # headless
-npm run test:e2e:headed   # visible browser (requires display)
+# E2E browser tests with real MetaMask (requires xvfb in containers)
+npm run test:e2e          # Runs in devcontainer or CI
+npm run test:e2e:debug    # Debug mode
 
 # All offline tests (excludes integration and E2E)
 npm run test:all
@@ -148,7 +148,34 @@ npm run test:full
 npm run lint
 ```
 
-The E2E tests use a mock Ethereum provider that simulates MetaMask while forwarding transactions to a local Anvil node. This allows testing the full user flow without requiring a real browser extension.
+### E2E Tests with Real MetaMask
+
+The E2E tests use [Synpress](https://synpress.io/) to test with a real MetaMask browser extension. This provides true end-to-end testing of wallet interactions including:
+
+- Wallet connection approval
+- Transaction signing and confirmation
+- Network switching
+- Multi-account workflows
+
+**Requirements:**
+
+- Linux environment with xvfb (devcontainer or CI)
+- Chromium browser (automatically installed)
+
+The tests automatically:
+
+1. Start Anvil (local Ethereum node)
+2. Deploy the Conference contract
+3. Build MetaMask wallet cache with test accounts
+4. Run tests with real MetaMask interactions
+
+```bash
+# Build/rebuild the MetaMask wallet cache
+npm run synpress:cache
+
+# Force rebuild (if wallet setup changes)
+npm run synpress:cache:force
+```
 
 ### Running Locally
 

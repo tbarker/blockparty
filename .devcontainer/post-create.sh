@@ -9,10 +9,6 @@ curl -L https://foundry.paradigm.xyz | bash
 source /home/node/.bashrc 2>/dev/null || true
 /home/node/.foundry/bin/foundryup
 
-# Install opencode AI tool globally
-echo "Installing opencode..."
-npm install -g opencode
-
 # Install npm dependencies
 echo "Installing npm dependencies..."
 npm install

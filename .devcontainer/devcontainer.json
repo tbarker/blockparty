@@ -5,7 +5,8 @@
     "context": ".."
   },
   "features": {
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+    "ghcr.io/danzilberdan/devcontainers/opencode:0": {}
   },
   "forwardPorts": [8545, 8080, 3000],
   "portsAttributes": {
@@ -22,6 +23,13 @@
       "onAutoForward": "notify"
     }
   },
+  "mounts": [
+        {
+            "source": "${localWorkspaceFolder}/.opencode/auth.json",
+            "target": "/mnt/opencode-auth.json",
+            "type": "bind"
+        }
+  ],
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {
     "vscode": {

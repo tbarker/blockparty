@@ -90,6 +90,19 @@ code blockparty
 
 This gives you Node.js 22, Foundry, and all dependencies ready to go.
 
+#### OpenCode AI Assistant
+
+The devcontainer includes [OpenCode](https://opencode.ai), an AI coding assistant. It's installed via the devcontainer feature `ghcr.io/danzilberdan/devcontainers/opencode:0`.
+
+**Authentication**: OpenCode credentials are bind-mounted from the host. Before opening the devcontainer, link your host's auth file ([details](https://www.danz.blog/blog/opencode-in-devcontainers)):
+
+```bash
+mkdir .opencode
+ln ~/.local/share/opencode/auth.json .opencode/
+```
+
+The devcontainer mounts `.opencode/auth.json` to `/mnt/opencode-auth.json`. Run `opencode` in the terminal to start.
+
 ### Local Installation
 
 Requires Node.js 20+ and [Foundry](https://book.getfoundry.sh/getting-started/installation).

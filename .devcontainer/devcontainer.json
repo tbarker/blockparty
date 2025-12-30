@@ -24,11 +24,11 @@
     }
   },
   "mounts": [
-        {
-            "source": "${localWorkspaceFolder}/.opencode/auth.json",
-            "target": "/mnt/opencode-auth.json",
-            "type": "bind"
-        }
+    {
+      "source": "${localWorkspaceFolder}/.opencode/auth.json",
+      "target": "/mnt/opencode-auth.json",
+      "type": "bind"
+    }
   ],
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "customizations": {
@@ -36,7 +36,6 @@
       "extensions": [
         "Anthropic.claude-code",
         "JuanBlanco.solidity",
-        "NomicFoundation.hardhat-solidity",
         "foundry-rs.foundry-vscode",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode"

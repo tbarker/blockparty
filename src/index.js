@@ -102,11 +102,28 @@ window.onload = function () {
 
     let contract = null;
     let contractAddress = null;
+    let contractError = null;
+
+    // Parse contract address from URL query parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const contractFromUrl = urlParams.get('contract');
 
     try {
-      // Get contract address from config or environment
-      // Priority: E2E config > app_config > env variable
-      if (window.__E2E_CONFIG__ && window.__E2E_CONFIG__.contractAddress) {
+      // Get contract address with priority:
+      // 1. URL query parameter (?contract=0x...)
+      // 2. E2E config (for testing)
+      // 3. app_config.js (network-based)
+      // 4. CONTRACT_ADDRESS env variable
+      if (contractFromUrl) {
+        // Validate the address format
+        if (ethers.isAddress(contractFromUrl)) {
+          contractAddress = contractFromUrl;
+          console.log('Using contract address from URL:', contractAddress);
+        } else {
+          contractError = `Invalid contract address in URL: ${contractFromUrl}`;
+          console.error(contractError);
+        }
+      } else if (window.__E2E_CONFIG__ && window.__E2E_CONFIG__.contractAddress) {
         contractAddress = window.__E2E_CONFIG__.contractAddress;
         console.log('Using E2E contract address:', contractAddress);
       } else if (
@@ -115,8 +132,10 @@ window.onload = function () {
         network_obj.contract_addresses['Conference']
       ) {
         contractAddress = network_obj.contract_addresses['Conference'];
+        console.log('Using contract address from config:', contractAddress);
       } else if (process.env.CONTRACT_ADDRESS) {
         contractAddress = process.env.CONTRACT_ADDRESS;
+        console.log('Using contract address from env:', contractAddress);
       }
 
       if (contractAddress) {
@@ -124,10 +143,12 @@ window.onload = function () {
         const contractRunner = signer || provider;
         contract = new ethers.Contract(contractAddress, ConferenceABI, contractRunner);
         console.log('Contract connected at:', contractAddress);
-      } else {
-        console.log('No contract address configured');
+      } else if (!contractError) {
+        contractError = 'No contract address provided. Add ?contract=0x... to the URL.';
+        console.log(contractError);
       }
     } catch (e) {
+      contractError = `Error connecting to contract: ${e.message}`;
       console.error('Error connecting to contract:', e);
     }
 
@@ -425,30 +446,65 @@ window.onload = function () {
 
           <Instruction eventEmitter={eventEmitter} />
           <Notification eventEmitter={eventEmitter} />
-          <Box className="container foo">
-            <ConferenceDetail
-              eventEmitter={eventEmitter}
-              getDetail={getDetail}
-              web3={ethersWrapper}
-              contract={contract}
-              contractAddress={contractAddress}
-            />
-            <Participants
-              eventEmitter={eventEmitter}
-              getDetail={getDetail}
-              getParticipants={getParticipants}
-              getAccounts={getAccounts}
-              action={action}
-              web3={ethersWrapper}
-            />
-          </Box>
-          <FormInput
-            read_only={read_only}
-            eventEmitter={eventEmitter}
-            getAccounts={getAccounts}
-            getDetail={getDetail}
-            action={action}
-          />
+
+          {contractError ? (
+            <Box
+              className="container"
+              sx={{
+                textAlign: 'center',
+                py: 8,
+                px: 2,
+              }}
+            >
+              <Typography variant="h5" color="error" gutterBottom>
+                {contractError}
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+                To view an event, add the contract address to the URL:
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 1,
+                  fontFamily: 'monospace',
+                  backgroundColor: '#f5f5f5',
+                  p: 2,
+                  borderRadius: 1,
+                  display: 'inline-block',
+                }}
+              >
+                {window.location.origin}
+                {window.location.pathname}?contract=0x...
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Box className="container foo">
+                <ConferenceDetail
+                  eventEmitter={eventEmitter}
+                  getDetail={getDetail}
+                  web3={ethersWrapper}
+                  contract={contract}
+                  contractAddress={contractAddress}
+                />
+                <Participants
+                  eventEmitter={eventEmitter}
+                  getDetail={getDetail}
+                  getParticipants={getParticipants}
+                  getAccounts={getAccounts}
+                  action={action}
+                  web3={ethersWrapper}
+                />
+              </Box>
+              <FormInput
+                read_only={read_only}
+                eventEmitter={eventEmitter}
+                getAccounts={getAccounts}
+                getDetail={getDetail}
+                action={action}
+              />
+            </>
+          )}
         </Box>
       </ThemeProvider>
     );

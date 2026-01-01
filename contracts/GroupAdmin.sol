@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./zeppelin/ownership/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title GroupAdmin
@@ -11,6 +11,8 @@ contract GroupAdmin is Ownable {
     event AdminGranted(address indexed grantee);
     event AdminRevoked(address indexed grantee);
     address[] public admins;
+
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     modifier onlyAdmin() {
         require(isAdmin(msg.sender), "GroupAdmin: caller is not an admin");
@@ -67,7 +69,7 @@ contract GroupAdmin is Ownable {
      * @return True if the given address is admin.
      */
     function isAdmin(address admin) public view returns (bool) {
-        if (admin == owner) return true;
+        if (admin == owner()) return true;
 
         for (uint i = 0; i < admins.length; i++) {
             if (admins[i] == admin) {

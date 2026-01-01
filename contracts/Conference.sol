@@ -2,9 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "./GroupAdmin.sol";
-import "./zeppelin/lifecycle/Destructible.sol";
 
-contract Conference is Destructible, GroupAdmin {
+contract Conference is GroupAdmin {
     string public name;
     uint256 public deposit;
     uint public limitOfParticipants;
@@ -62,7 +61,7 @@ contract Conference is Destructible, GroupAdmin {
         uint256 _deposit,
         uint _limitOfParticipants,
         uint _coolingPeriod
-    ) {
+    ) GroupAdmin(msg.sender) {
         if (bytes(_name).length != 0) {
             name = _name;
         } else {
@@ -192,8 +191,8 @@ contract Conference is Destructible, GroupAdmin {
     function clear() external onlyOwner onlyEnded {
         require(block.timestamp > endedAt + coolingPeriod, "Conference: cooling period not passed");
         uint leftOver = totalBalance();
-        owner.transfer(leftOver);
-        emit ClearEvent(owner, leftOver);
+        payable(owner()).transfer(leftOver);
+        emit ClearEvent(owner(), leftOver);
     }
 
     /**

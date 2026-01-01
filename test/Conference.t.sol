@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "../contracts/Conference.sol";
 
 contract ConferenceTest is Test {
@@ -54,7 +55,7 @@ contract ConferenceChangeNameTest is ConferenceTest {
     
     function test_NonOwnerCannotRenameEvent() public {
         vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
         conference.changeName("new name");
         assertEq(conference.name(), "Test");
     }
@@ -264,7 +265,7 @@ contract ConferencePaybackTest is ConferenceTest {
     
     function test_CannotWithdrawIfNonOwnerCalls() public {
         vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
         conference.payback();
         
         vm.prank(attended);
@@ -346,7 +347,7 @@ contract ConferenceCancelTest is ConferenceTest {
     
     function test_CannotCancelIfNonOwnerCalls() public {
         vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
         conference.cancel();
         
         vm.prank(attended);
@@ -480,7 +481,7 @@ contract ConferenceClearTest is ConferenceTest {
         assertEq(address(customConference).balance, customDeposit);
         
         vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
         customConference.clear();
         
         assertEq(address(customConference).balance, customDeposit);

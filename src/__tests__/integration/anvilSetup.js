@@ -49,7 +49,7 @@ const DEFAULT_DEPOSIT = ethers.parseEther('0.02');
 // Note: Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
 const TEST_CONFIG = {
   rpcUrl: 'http://127.0.0.1:8545',
-  chainId: 1337,
+  chainId: 31337, // Anvil default chain ID
   defaultEventName: 'Integration Test Event',
   defaultDeposit: DEFAULT_DEPOSIT,
   defaultLimit: 20,

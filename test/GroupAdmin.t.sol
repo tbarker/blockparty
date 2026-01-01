@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "../contracts/GroupAdmin.sol";
 
 contract GroupAdminTest is Test {
@@ -23,7 +24,7 @@ contract GroupAdminTest is Test {
         oneMoreOperator = makeAddr("oneMoreOperator");
         nonOperator = makeAddr("nonOperator");
         
-        admin = new GroupAdmin();
+        admin = new GroupAdmin(owner);
     }
 }
 
@@ -51,7 +52,7 @@ contract GroupAdminGrantTest is GroupAdminTest {
         admins[0] = operator;
         
         vm.prank(operator);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, operator));
         admin.grant(admins);
         
         assertFalse(admin.isAdmin(operator));
@@ -102,7 +103,7 @@ contract GroupAdminRevokeTest is GroupAdminTest {
         toRevoke[0] = operator;
         
         vm.prank(operator);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, operator));
         admin.revoke(toRevoke);
         
         assertTrue(admin.isAdmin(operator));

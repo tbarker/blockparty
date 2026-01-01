@@ -1,0 +1,19 @@
+{
+  "name": "ETH London March 2026",
+  "date": "2026-03-15T18:30:00Z",
+  "endDate": "2026-03-15T21:00:00Z",
+  "location": {
+    "name": "Imperial College London",
+    "address": "Sir Alexander Fleming Building, London SW7 2AZ",
+    "mapUrl": "https://maps.google.com/?q=Imperial+College+London+SAF+Building"
+  },
+  "description": "Monthly Ethereum London meetup featuring talks on L2 scaling and account abstraction. Join us for an evening of learning and networking with the London Ethereum community.",
+  "images": {
+    "banner": "./banner.png"
+  },
+  "links": {
+    "website": "https://ethereum.london",
+    "meetup": "https://meetup.com/ethereum-london",
+    "twitter": "https://twitter.com/EthereumLondon"
+  }
+}

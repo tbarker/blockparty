@@ -109,8 +109,15 @@ async function deployContract() {
   // deposit: 0.02 ETH (20000000000000000 wei)
   // limitOfParticipants: 20
   // coolingPeriod: 604800 (1 week in seconds)
+  // metadataUri: "" (empty for E2E tests)
   const factory = new ethers.ContractFactory(abi, bytecode, wallet);
-  const contract = await factory.deploy('E2E Test Event', ethers.parseEther('0.02'), 20, 604800);
+  const contract = await factory.deploy(
+    'E2E Test Event',
+    ethers.parseEther('0.02'),
+    20,
+    604800,
+    ''
+  );
 
   await contract.waitForDeployment();
   const contractAddress = await contract.getAddress();

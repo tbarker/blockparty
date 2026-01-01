@@ -35,7 +35,10 @@
     "dev": "webpack serve --mode development",
     "anvil": "anvil --chain-id 1337",
     "deploy:local": "forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-    "build-contracts": "forge build"
+    "build-contracts": "forge build",
+    "upload:metadata": "node scripts/upload-metadata.js",
+    "upload:metadata:devnet": "node scripts/upload-metadata.js --devnet",
+    "upload:metadata:dry-run": "node scripts/upload-metadata.js --dry-run"
   },
   "repository": {
     "type": "git",
@@ -55,6 +58,8 @@
     "@emotion/styled": "^11.14.0",
     "@ensdomains/ens": "^0.6.2",
     "@ensdomains/resolver": "^0.3.1",
+    "@irys/upload": "^0.0.15",
+    "@irys/upload-ethereum": "^0.0.16",
     "@mui/icons-material": "^7.0.0",
     "@mui/material": "^7.0.0",
     "axios": "^1.9.0",

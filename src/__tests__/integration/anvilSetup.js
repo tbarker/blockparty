@@ -123,13 +123,20 @@ async function deployContract(options = {}) {
     deposit = TEST_CONFIG.defaultDeposit,
     limitOfParticipants = TEST_CONFIG.defaultLimit,
     coolingPeriod = TEST_CONFIG.defaultCoolingPeriod,
+    metadataUri = '', // Empty string for integration tests
   } = options;
 
   const deployer = new ethers.Wallet(ANVIL_ACCOUNTS.deployer.privateKey, provider);
 
   const factory = new ethers.ContractFactory(arts.abi, arts.bytecode.object, deployer);
 
-  const contract = await factory.deploy(name, deposit, limitOfParticipants, coolingPeriod);
+  const contract = await factory.deploy(
+    name,
+    deposit,
+    limitOfParticipants,
+    coolingPeriod,
+    metadataUri
+  );
 
   await contract.waitForDeployment();
 

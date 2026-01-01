@@ -11,7 +11,7 @@ import Notification from './components/Notification';
 import Instruction from './components/Instruction';
 import Participants from './components/Participants';
 import NetworkLabel from './components/NetworkLabel';
-import Data from './components/Data';
+import { getArweaveMetadata } from './util/arweaveMetadata';
 
 import Avatar from '@mui/material/Avatar';
 import AppBar from '@mui/material/AppBar';
@@ -62,10 +62,8 @@ async function setup() {
       console.log('Connected to local node');
     } catch (error) {
       console.log('Local node not available, falling back to read_only mode');
-      // Fallback to Infura (using Sepolia as Rinkeby is deprecated)
-      const infuraUrl = Data[0].testnet
-        ? 'https://sepolia.infura.io/v3/your-project-id'
-        : 'https://mainnet.infura.io/v3/your-project-id';
+      // Fallback to Infura mainnet
+      const infuraUrl = 'https://mainnet.infura.io/v3/your-project-id';
       read_only = true;
       provider = new ethers.JsonRpcProvider(infuraUrl);
     }
@@ -152,13 +150,8 @@ window.onload = function () {
       console.error('Error connecting to contract:', e);
     }
 
-    // Find metadata for this contract
-    let metadata = contractAddress
-      ? Data.find(d => d.address?.toLowerCase() === contractAddress?.toLowerCase())
-      : null;
-    if (!metadata) {
-      metadata = { ...Data[0], address: contractAddress || '0x000' };
-    }
+    // Metadata will be fetched from Arweave when getDetail() is called
+    let arweaveMetadata = null;
 
     window.contract = contract;
     window.provider = provider;
@@ -205,6 +198,7 @@ window.onload = function () {
           limitOfParticipants,
           payoutAmount,
           admins,
+          metadataUri,
         ] = await Promise.all([
           contract.name(),
           contract.deposit(),
@@ -218,7 +212,17 @@ window.onload = function () {
           contract.limitOfParticipants(),
           contract.payoutAmount(),
           contract.getAdmins(),
+          contract.metadataUri().catch(() => ''), // Handle contracts without metadataUri
         ]);
+
+        // Fetch metadata from Arweave if URI is set (and not already cached)
+        if (metadataUri && !arweaveMetadata) {
+          console.log('Fetching metadata from Arweave:', metadataUri);
+          arweaveMetadata = await getArweaveMetadata(metadataUri);
+          if (arweaveMetadata) {
+            console.log('Loaded Arweave metadata:', arweaveMetadata);
+          }
+        }
 
         const contractBalance = await getBalance(await contract.getAddress());
 
@@ -236,10 +240,14 @@ window.onload = function () {
           payoutAmount,
           admins,
           contractBalance: parseFloat(ethers.formatEther(contractBalance)),
-          date: metadata.date,
-          map_url: metadata.map_url,
-          location_text: metadata.location_text,
-          description_text: metadata.description_text,
+          metadataUri,
+          // Metadata from Arweave (or null if not available)
+          date: arweaveMetadata?.date || null,
+          map_url: arweaveMetadata?.map_url || null,
+          location_text: arweaveMetadata?.location_text || null,
+          description_text: arweaveMetadata?.description_text || null,
+          images: arweaveMetadata?.images || null,
+          links: arweaveMetadata?.links || null,
         };
 
         if (detail.ended) {

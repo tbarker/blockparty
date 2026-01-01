@@ -8,7 +8,6 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
 import participantStatus from '../util/participantStatus';
-import cryptoBrowserify from 'crypto-browserify';
 
 const buttonStyle = { margin: '12px' };
 
@@ -62,19 +61,10 @@ class FormInput extends React.Component {
       case 'register':
         args.push(this.state.name);
         break;
-      case 'registerWithEncryption': {
-        args.push(this.state.name);
-        const encryptedData = cryptoBrowserify.publicEncrypt(
-          this.state.detail.encryption,
-          Buffer.from(this.state.full_name, 'utf-8')
-        );
-        args.push(encryptedData.toString('hex'));
-        break;
-      }
       default:
         break;
     }
-    if (actionName == 'register' || actionName == 'registerWithEncryption') {
+    if (actionName == 'register') {
       let obj = {
         action: 'register',
         user: this.state.address,
@@ -160,12 +150,6 @@ class FormInput extends React.Component {
     });
   }
 
-  handleEncryptedField(e) {
-    this.setState({
-      full_name: e.target.value,
-    });
-  }
-
   render() {
     let adminButtons, registerButton, attendButton, warningText;
 
@@ -226,7 +210,6 @@ class FormInput extends React.Component {
       );
     }
 
-    let encryptionField = null;
     var availableSpots = this.state.detail.limitOfParticipants - this.state.detail.registered;
     if (this.props.read_only) {
       registerButton = <span>Connect via Mist/Metamask to be able to register.</span>;
@@ -236,28 +219,13 @@ class FormInput extends React.Component {
       } else if (availableSpots <= 0) {
         registerButton = <span>No more spots left</span>;
       } else {
-        let actionName = 'register';
-        if (this.state.detail.encryption && this.showRegister()) {
-          encryptionField = (
-            <TextField
-              label="Full name * (to be encrypted)"
-              placeholder="Full name (required)"
-              value={this.state.full_name || ''}
-              onChange={this.handleEncryptedField.bind(this)}
-              variant="outlined"
-              size="small"
-              sx={{ margin: '0 5px' }}
-            />
-          );
-          actionName = 'registerWithEncryption';
-        }
         registerButton = (
           <Button
             variant="contained"
             color={this.showRegister() ? 'secondary' : 'inherit'}
             disabled={!this.showRegister()}
             style={buttonStyle}
-            onClick={this.handleAction.bind(this, actionName)}
+            onClick={this.handleAction.bind(this, 'register')}
           >
             RSVP
           </Button>
@@ -303,7 +271,6 @@ class FormInput extends React.Component {
     return (
       <Paper elevation={1} sx={{ padding: 2 }}>
         <Box component="form" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-          {encryptionField}
           {nameField}
           <FormControl sx={{ minWidth: '25em', margin: '0 5px' }} size="small">
             <InputLabel id="account-select-label">Account address</InputLabel>

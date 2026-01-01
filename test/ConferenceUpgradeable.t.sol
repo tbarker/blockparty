@@ -36,7 +36,7 @@ contract ConferenceUpgradeableBaseTest is Test {
         uint256 deposit,
         uint256 limitOfParticipants
     );
-    event RegisterEvent(address addr, string participantName, string _encryption);
+    event RegisterEvent(address addr, string participantName);
     event AttendEvent(address addr);
     event PaybackEvent(uint256 _payout);
     event WithdrawEvent(address addr, uint256 _payout);
@@ -69,8 +69,7 @@ contract ConferenceUpgradeableBaseTest is Test {
             "Test Conference",
             0.02 ether,
             20,
-            1 weeks,
-            ""
+            1 weeks
         );
         conferenceProxy = ConferenceUpgradeable(payable(proxyAddr));
         deposit = conferenceProxy.deposit();
@@ -111,7 +110,6 @@ contract ImplementationSecurityTest is ConferenceUpgradeableBaseTest {
             0.01 ether,
             100,
             1 days,
-            "",
             payable(nonOwner)
         );
     }
@@ -125,7 +123,6 @@ contract ImplementationSecurityTest is ConferenceUpgradeableBaseTest {
             0.01 ether,
             100,
             1 days,
-            "",
             payable(nonOwner)
         );
     }
@@ -153,8 +150,8 @@ contract ConferenceCreationTest is ConferenceUpgradeableBaseTest {
     
     function test_CanCreateMultipleConferences() public {
         vm.startPrank(conferenceOwner);
-        address proxy2 = factory.createConference("Event 2", 0.05 ether, 50, 2 weeks, "");
-        address proxy3 = factory.createConference("Event 3", 0.1 ether, 100, 3 weeks, "");
+        address proxy2 = factory.createConference("Event 2", 0.05 ether, 50, 2 weeks);
+        address proxy3 = factory.createConference("Event 3", 0.1 ether, 100, 3 weeks);
         vm.stopPrank();
         
         assertEq(factory.conferenceCount(), 3);
@@ -177,7 +174,7 @@ contract ConferenceCreationTest is ConferenceUpgradeableBaseTest {
         );
         
         vm.prank(conferenceOwner);
-        factory.createConference("New Event", 0.03 ether, 30, 1 weeks, "");
+        factory.createConference("New Event", 0.03 ether, 30, 1 weeks);
     }
 }
 
@@ -192,8 +189,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
             "Deterministic Event",
             0.02 ether,
             20,
-            1 weeks,
-            ""
+            1 weeks
         );
         
         // Deploy with the same salt
@@ -203,7 +199,6 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
             0.02 ether,
             20,
             1 weeks,
-            "",
             salt
         );
         
@@ -214,7 +209,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
         bytes32 salt = keccak256("duplicate-salt");
         
         vm.startPrank(conferenceOwner);
-        factory.createConferenceDeterministic("Event 1", 0, 0, 0, "", salt);
+        factory.createConferenceDeterministic("Event 1", 0, 0, 0, salt);
         
         // Second deployment with same salt should fail
         // Note: The revert happens at the EVM level during CREATE2 with collision
@@ -226,8 +221,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
             "Event 2",  // Different name but same salt
             0,
             0,
-            0,
-            ""
+            0
         );
         
         // Note: If the parameters are different, CREATE2 produces different bytecode
@@ -236,7 +230,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
         
         // Test collision with exact same parameters
         bytes32 salt2 = keccak256("collision-test");
-        factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, "key", salt2);
+        factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, salt2);
         
         // Same exact parameters with same salt WILL collide
         // The address calculation includes init data, so different owner = different address
@@ -245,7 +239,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
         
         // Test with a different caller - should produce different address
         vm.prank(nonOwner);
-        address differentOwnerAddr = factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, "key", salt2);
+        address differentOwnerAddr = factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, salt2);
         assertNotEq(differentOwnerAddr, predicted);
     }
 }
@@ -257,13 +251,6 @@ contract ConferenceRegistrationTest is ConferenceUpgradeableBaseTest {
         
         assertTrue(conferenceProxy.isRegistered(participant1));
         assertEq(conferenceProxy.registered(), 1);
-    }
-    
-    function test_CanRegisterWithEncryption() public {
-        vm.prank(participant1);
-        conferenceProxy.registerWithEncryption{value: deposit}(TWITTER_HANDLE, "encrypted-data");
-        
-        assertTrue(conferenceProxy.isRegistered(participant1));
     }
     
     function test_CannotRegisterWithWrongDeposit() public {
@@ -492,7 +479,7 @@ contract UpgradeTest is ConferenceUpgradeableBaseTest {
     function test_UpgradeAffectsAllProxies() public {
         // Create another conference
         vm.prank(conferenceOwner);
-        address proxy2Addr = factory.createConference("Event 2", 0, 0, 0, "");
+        address proxy2Addr = factory.createConference("Event 2", 0, 0, 0);
         
         // Register on second proxy
         vm.prank(participant2);
@@ -532,8 +519,8 @@ contract GetAllConferencesTest is ConferenceUpgradeableBaseTest {
     function test_ReturnsAllDeployedConferences() public {
         // Create additional conferences
         vm.startPrank(conferenceOwner);
-        address proxy2 = factory.createConference("Event 2", 0, 0, 0, "");
-        address proxy3 = factory.createConference("Event 3", 0, 0, 0, "");
+        address proxy2 = factory.createConference("Event 2", 0, 0, 0);
+        address proxy3 = factory.createConference("Event 3", 0, 0, 0);
         vm.stopPrank();
         
         address[] memory all = factory.getAllConferences();

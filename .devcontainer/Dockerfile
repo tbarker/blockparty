@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
     make \
     g++ \
     git \
-    openssl \
     curl \
     # Playwright/Chromium dependencies
     libnss3 \
@@ -46,13 +45,8 @@ RUN apt-get update && apt-get install -y \
 # Set up workspace directory
 WORKDIR /workspaces/blockparty
 
-# Generate test RSA keys for encryption tests (as node user)
-USER node
-RUN mkdir -p /home/node/tmp && \
-    openssl genrsa 2048 > /home/node/tmp/test_private.key && \
-    openssl rsa -pubout < /home/node/tmp/test_private.key > /home/node/tmp/test_public.key
-
 # Install Foundry (Ethereum development toolkit) - will be completed in postCreateCommand
+USER node
 # Foundry provides: forge (testing), cast (chain interaction), anvil (local node)
 ENV PATH="/home/node/.foundry/bin:${PATH}"
 

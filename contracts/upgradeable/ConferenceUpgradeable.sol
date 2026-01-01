@@ -30,7 +30,6 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         uint256 endedAt;
         uint256 coolingPeriod;
         uint256 payoutAmount;
-        string encryption;
         mapping(address => Participant) participants;
         mapping(uint256 => address) participantsIndex;
     }
@@ -52,7 +51,7 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         bool paid;
     }
 
-    event RegisterEvent(address addr, string participantName, string _encryption);
+    event RegisterEvent(address addr, string participantName);
     event AttendEvent(address addr);
     event PaybackEvent(uint256 _payout);
     event WithdrawEvent(address addr, uint256 _payout);
@@ -96,7 +95,6 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
      * @param _deposit The amount each participant deposits
      * @param _limitOfParticipants The maximum number of participants
      * @param _coolingPeriod Time after event ends before owner can claim unclaimed deposits
-     * @param _encryption Public key for encrypting participant data
      * @param _owner The address that will own this conference instance
      */
     function initialize(
@@ -104,7 +102,6 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         uint256 _deposit,
         uint256 _limitOfParticipants,
         uint256 _coolingPeriod,
-        string memory _encryption,
         address payable _owner
     ) public initializer {
         __GroupAdmin_init();
@@ -138,10 +135,6 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
             $.coolingPeriod = _coolingPeriod;
         } else {
             $.coolingPeriod = 1 weeks;
-        }
-
-        if (bytes(_encryption).length != 0) {
-            $.encryption = _encryption;
         }
     }
 
@@ -196,11 +189,6 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         return $.payoutAmount;
     }
 
-    function encryption() public view returns (string memory) {
-        ConferenceStorage storage $ = _getConferenceStorage();
-        return $.encryption;
-    }
-
     function participants(address _addr) public view returns (
         string memory participantName,
         address addr,
@@ -218,29 +206,10 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
     }
 
     /**
-     * @dev Registers with twitter name and full user name (the user name is encrypted).
-     * @param _participant The twitter address of the participant
-     * @param _encrypted The encrypted participant name
-     */
-    function registerWithEncryption(string calldata _participant, string calldata _encrypted) external payable onlyActive {
-        registerInternal(_participant);
-        emit RegisterEvent(msg.sender, _participant, _encrypted);
-    }
-
-    /**
      * @dev Registers with twitter name.
      * @param _participant The twitter address of the participant
      */
     function register(string calldata _participant) external payable onlyActive {
-        registerInternal(_participant);
-        emit RegisterEvent(msg.sender, _participant, "");
-    }
-
-    /**
-     * @dev The internal function to register participant
-     * @param _participant The twitter address of the participant
-     */
-    function registerInternal(string calldata _participant) internal {
         ConferenceStorage storage $ = _getConferenceStorage();
         require(msg.value == $.deposit, "Conference: incorrect deposit amount");
         require($.registered < $.limitOfParticipants, "Conference: participant limit reached");
@@ -249,6 +218,7 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         $.registered++;
         $.participantsIndex[$.registered] = msg.sender;
         $.participants[msg.sender] = Participant(_participant, msg.sender, false, false);
+        emit RegisterEvent(msg.sender, _participant);
     }
 
     /**

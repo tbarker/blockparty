@@ -15,7 +15,6 @@ contract Conference is Destructible, GroupAdmin {
     uint public endedAt;
     uint public coolingPeriod;
     uint256 public payoutAmount;
-    string public encryption;
 
     mapping(address => Participant) public participants;
     mapping(uint => address) public participantsIndex;
@@ -27,7 +26,7 @@ contract Conference is Destructible, GroupAdmin {
         bool paid;
     }
 
-    event RegisterEvent(address addr, string participantName, string _encryption);
+    event RegisterEvent(address addr, string participantName);
     event AttendEvent(address addr);
     event PaybackEvent(uint256 _payout);
     event WithdrawEvent(address addr, uint256 _payout);
@@ -57,14 +56,12 @@ contract Conference is Destructible, GroupAdmin {
      * @param _deposit The amount each participant deposits. The default is set to 0.02 Ether. The amount cannot be changed once deployed.
      * @param _limitOfParticipants The number of participant. The default is set to 20. The number can be changed by the owner of the event.
      * @param _coolingPeriod The period participants should withdraw their deposit after the event ends. After the cooling period, the event owner can claim the remaining deposits.
-     * @param _encryption A public key. The admin can use this public key to encrypt participant username which is stored in event. The admin can later decrypt the name using his/her private key.
      */
     constructor(
         string memory _name,
         uint256 _deposit,
         uint _limitOfParticipants,
-        uint _coolingPeriod,
-        string memory _encryption
+        uint _coolingPeriod
     ) {
         if (bytes(_name).length != 0) {
             name = _name;
@@ -89,20 +86,6 @@ contract Conference is Destructible, GroupAdmin {
         } else {
             coolingPeriod = 1 weeks;
         }
-
-        if (bytes(_encryption).length != 0) {
-            encryption = _encryption;
-        }
-    }
-
-    /**
-     * @dev Registers with twitter name and full user name (the user name is encrypted).
-     * @param _participant The twitter address of the participant
-     * @param _encrypted The encrypted participant name
-     */
-    function registerWithEncryption(string calldata _participant, string calldata _encrypted) external payable onlyActive {
-        registerInternal(_participant);
-        emit RegisterEvent(msg.sender, _participant, _encrypted);
     }
 
     /**
@@ -110,15 +93,6 @@ contract Conference is Destructible, GroupAdmin {
      * @param _participant The twitter address of the participant
      */
     function register(string calldata _participant) external payable onlyActive {
-        registerInternal(_participant);
-        emit RegisterEvent(msg.sender, _participant, "");
-    }
-
-    /**
-     * @dev The internal function to register participant
-     * @param _participant The twitter address of the participant
-     */
-    function registerInternal(string calldata _participant) internal {
         require(msg.value == deposit, "Conference: incorrect deposit amount");
         require(registered < limitOfParticipants, "Conference: participant limit reached");
         require(!isRegistered(msg.sender), "Conference: already registered");
@@ -126,6 +100,7 @@ contract Conference is Destructible, GroupAdmin {
         registered++;
         participantsIndex[registered] = msg.sender;
         participants[msg.sender] = Participant(_participant, msg.sender, false, false);
+        emit RegisterEvent(msg.sender, _participant);
     }
 
     /**

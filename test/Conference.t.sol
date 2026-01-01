@@ -17,7 +17,7 @@ contract ConferenceTest is Test {
     string public constant TWITTER_HANDLE = "@bighero6";
     uint256 public deposit;
     
-    event RegisterEvent(address addr, string participantName, string _encryption);
+    event RegisterEvent(address addr, string participantName);
     event AttendEvent(address addr);
     event PaybackEvent(uint256 _payout);
     event WithdrawEvent(address addr, uint256 _payout);
@@ -41,7 +41,7 @@ contract ConferenceTest is Test {
         vm.deal(admin, 100 ether);
         
         // Deploy with default values
-        conference = new Conference("", 0, 0, 0, "");
+        conference = new Conference("", 0, 0, 0);
         deposit = conference.deposit();
     }
 }
@@ -113,11 +113,10 @@ contract ConferenceCreationTest is ConferenceTest {
     }
     
     function test_CanSetConfigValues() public {
-        Conference customConference = new Conference("Test 1", 2 ether, 100, 2, "public key");
+        Conference customConference = new Conference("Test 1", 2 ether, 100, 2);
         assertEq(customConference.name(), "Test 1");
         assertEq(customConference.deposit(), 2 ether);
         assertEq(customConference.limitOfParticipants(), 100);
-        assertEq(customConference.encryption(), "public key");
     }
 }
 
@@ -469,12 +468,12 @@ contract ConferenceClearTest is ConferenceTest {
     }
     
     function test_CoolingPeriodCanBeSet() public {
-        Conference customConference = new Conference("", 0, 0, 10, "");
+        Conference customConference = new Conference("", 0, 0, 10);
         assertEq(customConference.coolingPeriod(), 10);
     }
     
     function test_CannotClearByNonOwner() public {
-        Conference customConference = new Conference("", 0, 0, 10, "");
+        Conference customConference = new Conference("", 0, 0, 10);
         uint256 customDeposit = customConference.deposit();
         
         customConference.register{value: customDeposit}("one");
@@ -515,7 +514,7 @@ contract ConferenceClearTest is ConferenceTest {
         vm.deal(testOwner, 100 ether);
         
         vm.prank(testOwner);
-        Conference customConference = new Conference("", 0, 0, 1, "");
+        Conference customConference = new Conference("", 0, 0, 1);
         uint256 customDeposit = customConference.deposit();
         
         vm.prank(testOwner);
@@ -541,20 +540,4 @@ contract ConferenceClearTest is ConferenceTest {
     }
 }
 
-contract ConferenceEncryptionTest is ConferenceTest {
-    function test_CanRegisterWithEncryption() public {
-        string memory publicKey = "test-public-key";
-        Conference encryptedConference = new Conference("", 0, 0, 10, publicKey);
-        uint256 encDeposit = encryptedConference.deposit();
-        
-        assertEq(encryptedConference.encryption(), publicKey);
-        
-        vm.expectEmit(true, true, true, true);
-        emit RegisterEvent(owner, TWITTER_HANDLE, "encrypted-data");
-        
-        encryptedConference.registerWithEncryption{value: encDeposit}(TWITTER_HANDLE, "encrypted-data");
-        
-        assertEq(encryptedConference.registered(), 1);
-        assertTrue(encryptedConference.isRegistered(owner));
-    }
-}
+

@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y \
     make \
     g++ \
     git \
-    openssl \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -39,11 +38,6 @@ RUN rm -rf lib/forge-std && forge install foundry-rs/forge-std --no-git
 
 # Build contracts
 RUN forge build
-
-# Generate test keys for encryption tests
-RUN mkdir -p tmp && \
-    openssl genrsa 2048 > tmp/test_private.key && \
-    openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
 
 # Expose ports
 EXPOSE 8545 8080

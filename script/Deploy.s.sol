@@ -17,7 +17,6 @@ contract DeployConference is Script {
         uint256 deposit = vm.envOr("CONFERENCE_DEPOSIT", uint256(0.02 ether));
         uint256 limitOfParticipants = vm.envOr("CONFERENCE_LIMIT", uint256(20));
         uint256 coolingPeriod = vm.envOr("CONFERENCE_COOLING_PERIOD", uint256(1 weeks));
-        string memory encryption = vm.envOr("CONFERENCE_ENCRYPTION", string(""));
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
@@ -27,8 +26,7 @@ contract DeployConference is Script {
             name,
             deposit,
             limitOfParticipants,
-            coolingPeriod,
-            encryption
+            coolingPeriod
         );
         
         vm.stopBroadcast();
@@ -54,8 +52,7 @@ contract DeployConferenceLocal is Script {
             "BlockParty Local",
             0.02 ether,
             20,
-            1 weeks,
-            ""
+            1 weeks
         );
         
         vm.stopBroadcast();
@@ -101,7 +98,7 @@ contract DeployConferenceFactory is Script {
         console.log("Factory owner:", factory.owner());
         console.log("");
         console.log("To create a new conference, call:");
-        console.log("  factory.createConference(name, deposit, limit, coolingPeriod, encryption)");
+        console.log("  factory.createConference(name, deposit, limit, coolingPeriod)");
     }
 }
 
@@ -125,8 +122,7 @@ contract DeployConferenceFactoryLocal is Script {
             "BlockParty Local",
             0.02 ether,
             20,
-            1 weeks,
-            ""
+            1 weeks
         );
         
         vm.stopBroadcast();
@@ -153,7 +149,6 @@ contract DeployConferenceFactoryLocal is Script {
  *   CONFERENCE_DEPOSIT - Deposit amount in wei (default: 0.02 ether)
  *   CONFERENCE_LIMIT - Max participants (default: 20)
  *   CONFERENCE_COOLING_PERIOD - Cooling period in seconds (default: 1 week)
- *   CONFERENCE_ENCRYPTION - Public key for encryption (optional)
  * 
  * Usage:
  *   FACTORY_ADDRESS=0x... forge script script/Deploy.s.sol:CreateConferenceViaFactory --broadcast --rpc-url <RPC_URL> --private-key <KEY>
@@ -165,7 +160,6 @@ contract CreateConferenceViaFactory is Script {
         uint256 deposit = vm.envOr("CONFERENCE_DEPOSIT", uint256(0.02 ether));
         uint256 limitOfParticipants = vm.envOr("CONFERENCE_LIMIT", uint256(20));
         uint256 coolingPeriod = vm.envOr("CONFERENCE_COOLING_PERIOD", uint256(1 weeks));
-        string memory encryption = vm.envOr("CONFERENCE_ENCRYPTION", string(""));
         
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
@@ -179,8 +173,7 @@ contract CreateConferenceViaFactory is Script {
             name,
             deposit,
             limitOfParticipants,
-            coolingPeriod,
-            encryption
+            coolingPeriod
         );
         
         vm.stopBroadcast();

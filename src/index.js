@@ -183,7 +183,6 @@ window.onload = function () {
           cancelled,
           limitOfParticipants,
           payoutAmount,
-          encryption,
           admins,
         ] = await Promise.all([
           contract.name(),
@@ -197,7 +196,6 @@ window.onload = function () {
           contract.cancelled(),
           contract.limitOfParticipants(),
           contract.payoutAmount(),
-          contract.encryption(),
           contract.getAdmins(),
         ]);
 
@@ -215,7 +213,6 @@ window.onload = function () {
           cancelled,
           limitOfParticipants,
           payoutAmount,
-          encryption,
           admins,
           contractBalance: parseFloat(ethers.formatEther(contractBalance)),
           date: metadata.date,

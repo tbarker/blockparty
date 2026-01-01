@@ -25,14 +25,6 @@ forge build
 echo "Installing Playwright browsers..."
 npx playwright install chromium
 
-# Copy test keys to project tmp directory if they don't exist
-echo "Setting up test encryption keys..."
-mkdir -p tmp
-if [ ! -f tmp/test_private.key ]; then
-    cp /home/node/tmp/test_private.key tmp/
-    cp /home/node/tmp/test_public.key tmp/
-fi
-
 echo ""
 echo "=== Setup Complete ==="
 echo ""

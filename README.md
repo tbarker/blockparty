@@ -116,11 +116,6 @@ foundryup
 git clone https://github.com/makoto/blockparty.git
 cd blockparty
 npm install
-
-# Generate test encryption keys (optional, for encryption tests)
-mkdir -p tmp
-openssl genrsa 2048 > tmp/test_private.key
-openssl rsa -pubout < tmp/test_private.key > tmp/test_public.key
 ```
 
 ### Running Tests

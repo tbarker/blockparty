@@ -42,6 +42,7 @@ contract ConferenceUpgradeableBaseTest is Test {
     event WithdrawEvent(address addr, uint256 _payout);
     event CancelEvent();
     event ImplementationUpgraded(address indexed oldImplementation, address indexed newImplementation);
+    event MetadataUpdated(string uri);
     
     function setUp() public virtual {
         factoryOwner = makeAddr("factoryOwner");
@@ -69,7 +70,8 @@ contract ConferenceUpgradeableBaseTest is Test {
             "Test Conference",
             0.02 ether,
             20,
-            1 weeks
+            1 weeks,
+            ""
         );
         conferenceProxy = ConferenceUpgradeable(payable(proxyAddr));
         deposit = conferenceProxy.deposit();
@@ -110,6 +112,7 @@ contract ImplementationSecurityTest is ConferenceUpgradeableBaseTest {
             0.01 ether,
             100,
             1 days,
+            "",
             payable(nonOwner)
         );
     }
@@ -123,6 +126,7 @@ contract ImplementationSecurityTest is ConferenceUpgradeableBaseTest {
             0.01 ether,
             100,
             1 days,
+            "",
             payable(nonOwner)
         );
     }
@@ -150,8 +154,8 @@ contract ConferenceCreationTest is ConferenceUpgradeableBaseTest {
     
     function test_CanCreateMultipleConferences() public {
         vm.startPrank(conferenceOwner);
-        address proxy2 = factory.createConference("Event 2", 0.05 ether, 50, 2 weeks);
-        address proxy3 = factory.createConference("Event 3", 0.1 ether, 100, 3 weeks);
+        address proxy2 = factory.createConference("Event 2", 0.05 ether, 50, 2 weeks, "");
+        address proxy3 = factory.createConference("Event 3", 0.1 ether, 100, 3 weeks, "ar://xyz789");
         vm.stopPrank();
         
         assertEq(factory.conferenceCount(), 3);
@@ -161,6 +165,7 @@ contract ConferenceCreationTest is ConferenceUpgradeableBaseTest {
         // Each conference should have its own state
         assertEq(ConferenceUpgradeable(payable(proxy2)).deposit(), 0.05 ether);
         assertEq(ConferenceUpgradeable(payable(proxy3)).deposit(), 0.1 ether);
+        assertEq(ConferenceUpgradeable(payable(proxy3)).metadataUri(), "ar://xyz789");
     }
     
     function test_EmitsConferenceCreatedEvent() public {
@@ -174,7 +179,7 @@ contract ConferenceCreationTest is ConferenceUpgradeableBaseTest {
         );
         
         vm.prank(conferenceOwner);
-        factory.createConference("New Event", 0.03 ether, 30, 1 weeks);
+        factory.createConference("New Event", 0.03 ether, 30, 1 weeks, "");
     }
 }
 
@@ -189,7 +194,8 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
             "Deterministic Event",
             0.02 ether,
             20,
-            1 weeks
+            1 weeks,
+            "ar://abc123"
         );
         
         // Deploy with the same salt
@@ -199,6 +205,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
             0.02 ether,
             20,
             1 weeks,
+            "ar://abc123",
             salt
         );
         
@@ -209,7 +216,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
         bytes32 salt = keccak256("duplicate-salt");
         
         vm.startPrank(conferenceOwner);
-        factory.createConferenceDeterministic("Event 1", 0, 0, 0, salt);
+        factory.createConferenceDeterministic("Event 1", 0, 0, 0, "", salt);
         
         // Second deployment with same salt should fail
         // Note: The revert happens at the EVM level during CREATE2 with collision
@@ -221,7 +228,8 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
             "Event 2",  // Different name but same salt
             0,
             0,
-            0
+            0,
+            ""
         );
         
         // Note: If the parameters are different, CREATE2 produces different bytecode
@@ -230,7 +238,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
         
         // Test collision with exact same parameters
         bytes32 salt2 = keccak256("collision-test");
-        factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, salt2);
+        factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, "", salt2);
         
         // Same exact parameters with same salt WILL collide
         // The address calculation includes init data, so different owner = different address
@@ -239,7 +247,7 @@ contract DeterministicDeploymentTest is ConferenceUpgradeableBaseTest {
         
         // Test with a different caller - should produce different address
         vm.prank(nonOwner);
-        address differentOwnerAddr = factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, salt2);
+        address differentOwnerAddr = factory.createConferenceDeterministic("Same Event", 0.01 ether, 10, 1 days, "", salt2);
         assertNotEq(differentOwnerAddr, predicted);
     }
 }
@@ -417,6 +425,56 @@ contract MockConferenceV2 is ConferenceUpgradeable {
     }
 }
 
+contract ConferenceMetadataUriTest is ConferenceUpgradeableBaseTest {
+    function test_MetadataUriIsSetOnCreation() public {
+        vm.prank(conferenceOwner);
+        address proxyAddr = factory.createConference(
+            "Event With Metadata",
+            0.02 ether,
+            20,
+            1 weeks,
+            "ar://testTxId123"
+        );
+        
+        assertEq(ConferenceUpgradeable(payable(proxyAddr)).metadataUri(), "ar://testTxId123");
+    }
+    
+    function test_MetadataUriCanBeEmpty() public view {
+        // The conference created in setUp has empty metadataUri
+        assertEq(conferenceProxy.metadataUri(), "");
+    }
+    
+    function test_OwnerCanSetMetadataUri() public {
+        vm.prank(conferenceOwner);
+        conferenceProxy.setMetadataUri("ar://newUri456");
+        
+        assertEq(conferenceProxy.metadataUri(), "ar://newUri456");
+    }
+    
+    function test_SetMetadataUriEmitsEvent() public {
+        vm.expectEmit(true, true, true, true);
+        emit MetadataUpdated("ar://newUri456");
+        
+        vm.prank(conferenceOwner);
+        conferenceProxy.setMetadataUri("ar://newUri456");
+    }
+    
+    function test_NonOwnerCannotSetMetadataUri() public {
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        conferenceProxy.setMetadataUri("ar://newUri456");
+    }
+    
+    function test_CannotSetMetadataUriAfterRegistration() public {
+        vm.prank(participant1);
+        conferenceProxy.register{value: deposit}(TWITTER_HANDLE);
+        
+        vm.prank(conferenceOwner);
+        vm.expectRevert("Conference: participants already registered");
+        conferenceProxy.setMetadataUri("ar://newUri456");
+    }
+}
+
 contract UpgradeTest is ConferenceUpgradeableBaseTest {
     MockConferenceV2 public newImplementation;
     
@@ -479,7 +537,7 @@ contract UpgradeTest is ConferenceUpgradeableBaseTest {
     function test_UpgradeAffectsAllProxies() public {
         // Create another conference
         vm.prank(conferenceOwner);
-        address proxy2Addr = factory.createConference("Event 2", 0, 0, 0);
+        address proxy2Addr = factory.createConference("Event 2", 0, 0, 0, "");
         
         // Register on second proxy
         vm.prank(participant2);
@@ -519,8 +577,8 @@ contract GetAllConferencesTest is ConferenceUpgradeableBaseTest {
     function test_ReturnsAllDeployedConferences() public {
         // Create additional conferences
         vm.startPrank(conferenceOwner);
-        address proxy2 = factory.createConference("Event 2", 0, 0, 0);
-        address proxy3 = factory.createConference("Event 3", 0, 0, 0);
+        address proxy2 = factory.createConference("Event 2", 0, 0, 0, "");
+        address proxy3 = factory.createConference("Event 3", 0, 0, 0, "ar://metadata3");
         vm.stopPrank();
         
         address[] memory all = factory.getAllConferences();

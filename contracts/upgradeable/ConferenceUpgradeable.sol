@@ -21,6 +21,7 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
     /// @custom:storage-location erc7201:blockparty.storage.ConferenceUpgradeable
     struct ConferenceStorage {
         string name;
+        string metadataUri;  // Arweave URI for off-chain metadata (e.g., "ar://txId")
         uint256 deposit;
         uint256 limitOfParticipants;
         uint256 registered;
@@ -57,6 +58,7 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
     event WithdrawEvent(address addr, uint256 _payout);
     event CancelEvent();
     event ClearEvent(address addr, uint256 leftOver);
+    event MetadataUpdated(string uri);
 
     /* Modifiers */
     modifier onlyActive() {
@@ -95,6 +97,7 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
      * @param _deposit The amount each participant deposits
      * @param _limitOfParticipants The maximum number of participants
      * @param _coolingPeriod Time after event ends before owner can claim unclaimed deposits
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId"). Can be empty string.
      * @param _owner The address that will own this conference instance
      */
     function initialize(
@@ -102,6 +105,7 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         uint256 _deposit,
         uint256 _limitOfParticipants,
         uint256 _coolingPeriod,
+        string memory _metadataUri,
         address payable _owner
     ) public initializer {
         __GroupAdmin_init();
@@ -136,12 +140,19 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         } else {
             $.coolingPeriod = 1 weeks;
         }
+
+        $.metadataUri = _metadataUri;
     }
 
     /* Public view functions */
     function name() public view returns (string memory) {
         ConferenceStorage storage $ = _getConferenceStorage();
         return $.name;
+    }
+
+    function metadataUri() public view returns (string memory) {
+        ConferenceStorage storage $ = _getConferenceStorage();
+        return $.metadataUri;
     }
 
     function deposit() public view returns (uint256) {
@@ -338,6 +349,16 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
     function changeName(string calldata _name) external onlyOwner noOneRegistered {
         ConferenceStorage storage $ = _getConferenceStorage();
         $.name = _name;
+    }
+
+    /**
+     * @dev Set or update the metadata URI. The owner can change it as long as no one has registered yet.
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId").
+     */
+    function setMetadataUri(string calldata _metadataUri) external onlyOwner noOneRegistered {
+        ConferenceStorage storage $ = _getConferenceStorage();
+        $.metadataUri = _metadataUri;
+        emit MetadataUpdated(_metadataUri);
     }
 
     /**

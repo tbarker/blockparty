@@ -24,6 +24,7 @@ contract ConferenceTest is Test {
     event WithdrawEvent(address addr, uint256 _payout);
     event CancelEvent();
     event ClearEvent(address addr, uint256 leftOver);
+    event MetadataUpdated(string uri);
     
     function setUp() public virtual {
         owner = address(this);
@@ -42,7 +43,7 @@ contract ConferenceTest is Test {
         vm.deal(admin, 100 ether);
         
         // Deploy with default values
-        conference = new Conference("", 0, 0, 0);
+        conference = new Conference("", 0, 0, 0, "");
         deposit = conference.deposit();
     }
 }
@@ -65,6 +66,40 @@ contract ConferenceChangeNameTest is ConferenceTest {
         vm.expectRevert("Conference: participants already registered");
         conference.changeName("new name");
         assertEq(conference.name(), "Test");
+    }
+}
+
+contract ConferenceMetadataUriTest is ConferenceTest {
+    function test_OwnerCanSetMetadataUri() public {
+        conference.setMetadataUri("ar://newTxId123");
+        assertEq(conference.metadataUri(), "ar://newTxId123");
+    }
+    
+    function test_SetMetadataUriEmitsEvent() public {
+        vm.expectEmit(true, true, true, true);
+        emit MetadataUpdated("ar://newTxId123");
+        conference.setMetadataUri("ar://newTxId123");
+    }
+    
+    function test_NonOwnerCannotSetMetadataUri() public {
+        vm.prank(nonOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
+        conference.setMetadataUri("ar://newTxId123");
+        assertEq(conference.metadataUri(), "");
+    }
+    
+    function test_CannotSetMetadataUriOnceRegistered() public {
+        conference.register{value: deposit}(TWITTER_HANDLE);
+        vm.expectRevert("Conference: participants already registered");
+        conference.setMetadataUri("ar://newTxId123");
+        assertEq(conference.metadataUri(), "");
+    }
+    
+    function test_CanSetMetadataUriToEmpty() public {
+        Conference customConference = new Conference("Test", 0, 0, 0, "ar://initialUri");
+        assertEq(customConference.metadataUri(), "ar://initialUri");
+        customConference.setMetadataUri("");
+        assertEq(customConference.metadataUri(), "");
     }
 }
 
@@ -114,10 +149,20 @@ contract ConferenceCreationTest is ConferenceTest {
     }
     
     function test_CanSetConfigValues() public {
-        Conference customConference = new Conference("Test 1", 2 ether, 100, 2);
+        Conference customConference = new Conference("Test 1", 2 ether, 100, 2, "");
         assertEq(customConference.name(), "Test 1");
         assertEq(customConference.deposit(), 2 ether);
         assertEq(customConference.limitOfParticipants(), 100);
+    }
+    
+    function test_CanSetMetadataUri() public {
+        Conference customConference = new Conference("Test 1", 0, 0, 0, "ar://abc123");
+        assertEq(customConference.metadataUri(), "ar://abc123");
+    }
+    
+    function test_MetadataUriCanBeEmpty() public {
+        Conference customConference = new Conference("Test 1", 0, 0, 0, "");
+        assertEq(customConference.metadataUri(), "");
     }
 }
 
@@ -469,12 +514,12 @@ contract ConferenceClearTest is ConferenceTest {
     }
     
     function test_CoolingPeriodCanBeSet() public {
-        Conference customConference = new Conference("", 0, 0, 10);
+        Conference customConference = new Conference("", 0, 0, 10, "");
         assertEq(customConference.coolingPeriod(), 10);
     }
     
     function test_CannotClearByNonOwner() public {
-        Conference customConference = new Conference("", 0, 0, 10);
+        Conference customConference = new Conference("", 0, 0, 10, "");
         uint256 customDeposit = customConference.deposit();
         
         customConference.register{value: customDeposit}("one");
@@ -515,7 +560,7 @@ contract ConferenceClearTest is ConferenceTest {
         vm.deal(testOwner, 100 ether);
         
         vm.prank(testOwner);
-        Conference customConference = new Conference("", 0, 0, 1);
+        Conference customConference = new Conference("", 0, 0, 1, "");
         uint256 customDeposit = customConference.deposit();
         
         vm.prank(testOwner);

@@ -5,6 +5,7 @@ import "./GroupAdmin.sol";
 
 contract Conference is GroupAdmin {
     string public name;
+    string public metadataUri;  // Arweave URI for off-chain metadata (e.g., "ar://txId")
     uint256 public deposit;
     uint public limitOfParticipants;
     uint public registered;
@@ -31,6 +32,7 @@ contract Conference is GroupAdmin {
     event WithdrawEvent(address addr, uint256 _payout);
     event CancelEvent();
     event ClearEvent(address addr, uint256 leftOver);
+    event MetadataUpdated(string uri);
 
     /* Modifiers */
     modifier onlyActive() {
@@ -55,12 +57,14 @@ contract Conference is GroupAdmin {
      * @param _deposit The amount each participant deposits. The default is set to 0.02 Ether. The amount cannot be changed once deployed.
      * @param _limitOfParticipants The number of participant. The default is set to 20. The number can be changed by the owner of the event.
      * @param _coolingPeriod The period participants should withdraw their deposit after the event ends. After the cooling period, the event owner can claim the remaining deposits.
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId"). Can be empty string.
      */
     constructor(
         string memory _name,
         uint256 _deposit,
         uint _limitOfParticipants,
-        uint _coolingPeriod
+        uint _coolingPeriod,
+        string memory _metadataUri
     ) GroupAdmin(msg.sender) {
         if (bytes(_name).length != 0) {
             name = _name;
@@ -85,6 +89,8 @@ contract Conference is GroupAdmin {
         } else {
             coolingPeriod = 1 weeks;
         }
+
+        metadataUri = _metadataUri;
     }
 
     /**
@@ -209,6 +215,15 @@ contract Conference is GroupAdmin {
      */
     function changeName(string calldata _name) external onlyOwner noOneRegistered {
         name = _name;
+    }
+
+    /**
+     * @dev Set or update the metadata URI. The owner can change it as long as no one has registered yet.
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId").
+     */
+    function setMetadataUri(string calldata _metadataUri) external onlyOwner noOneRegistered {
+        metadataUri = _metadataUri;
+        emit MetadataUpdated(_metadataUri);
     }
 
     /**

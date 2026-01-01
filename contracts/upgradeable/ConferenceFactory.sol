@@ -65,13 +65,15 @@ contract ConferenceFactory is Ownable {
      * @param _deposit The amount each participant deposits (0 for default 0.02 ETH)
      * @param _limitOfParticipants The max participants (0 for default 20)
      * @param _coolingPeriod Time before owner can claim unclaimed deposits (0 for default 1 week)
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId"). Can be empty string.
      * @return proxy The address of the newly created conference proxy
      */
     function createConference(
         string memory _name,
         uint256 _deposit,
         uint256 _limitOfParticipants,
-        uint256 _coolingPeriod
+        uint256 _coolingPeriod,
+        string memory _metadataUri
     ) external returns (address proxy) {
         // Encode the initialization call
         bytes memory initData = abi.encodeWithSelector(
@@ -80,6 +82,7 @@ contract ConferenceFactory is Ownable {
             _deposit,
             _limitOfParticipants,
             _coolingPeriod,
+            _metadataUri,
             payable(msg.sender) // Conference owner is the caller
         );
         
@@ -106,6 +109,7 @@ contract ConferenceFactory is Ownable {
      * @param _deposit The amount each participant deposits
      * @param _limitOfParticipants The max participants
      * @param _coolingPeriod Time before owner can claim unclaimed deposits
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId"). Can be empty string.
      * @param salt Unique salt for deterministic address generation
      * @return proxy The address of the newly created conference proxy
      */
@@ -114,6 +118,7 @@ contract ConferenceFactory is Ownable {
         uint256 _deposit,
         uint256 _limitOfParticipants,
         uint256 _coolingPeriod,
+        string memory _metadataUri,
         bytes32 salt
     ) external returns (address proxy) {
         bytes memory initData = abi.encodeWithSelector(
@@ -122,6 +127,7 @@ contract ConferenceFactory is Ownable {
             _deposit,
             _limitOfParticipants,
             _coolingPeriod,
+            _metadataUri,
             payable(msg.sender)
         );
         
@@ -149,6 +155,7 @@ contract ConferenceFactory is Ownable {
      * @param _deposit The deposit amount
      * @param _limitOfParticipants The participant limit
      * @param _coolingPeriod The cooling period
+     * @param _metadataUri The Arweave URI for off-chain metadata
      * @return The predicted address
      */
     function predictConferenceAddress(
@@ -157,7 +164,8 @@ contract ConferenceFactory is Ownable {
         string memory _name,
         uint256 _deposit,
         uint256 _limitOfParticipants,
-        uint256 _coolingPeriod
+        uint256 _coolingPeriod,
+        string memory _metadataUri
     ) external view returns (address) {
         bytes memory initData = abi.encodeWithSelector(
             ConferenceUpgradeable.initialize.selector,
@@ -165,6 +173,7 @@ contract ConferenceFactory is Ownable {
             _deposit,
             _limitOfParticipants,
             _coolingPeriod,
+            _metadataUri,
             payable(conferenceOwner)
         );
         

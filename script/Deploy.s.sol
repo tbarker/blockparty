@@ -17,6 +17,7 @@ contract DeployConference is Script {
         uint256 deposit = vm.envOr("CONFERENCE_DEPOSIT", uint256(0.02 ether));
         uint256 limitOfParticipants = vm.envOr("CONFERENCE_LIMIT", uint256(20));
         uint256 coolingPeriod = vm.envOr("CONFERENCE_COOLING_PERIOD", uint256(1 weeks));
+        string memory metadataUri = vm.envOr("METADATA_URI", string(""));
 
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
@@ -26,7 +27,8 @@ contract DeployConference is Script {
             name,
             deposit,
             limitOfParticipants,
-            coolingPeriod
+            coolingPeriod,
+            metadataUri
         );
         
         vm.stopBroadcast();
@@ -36,6 +38,7 @@ contract DeployConference is Script {
         console.log("Deposit:", deposit);
         console.log("Limit:", limitOfParticipants);
         console.log("Cooling Period:", coolingPeriod);
+        console.log("Metadata URI:", metadataUri);
     }
 }
 
@@ -52,7 +55,8 @@ contract DeployConferenceLocal is Script {
             "BlockParty Local",
             0.02 ether,
             20,
-            1 weeks
+            1 weeks,
+            ""  // Empty metadata URI for local development
         );
         
         vm.stopBroadcast();
@@ -122,7 +126,8 @@ contract DeployConferenceFactoryLocal is Script {
             "BlockParty Local",
             0.02 ether,
             20,
-            1 weeks
+            1 weeks,
+            ""  // Empty metadata URI for local development
         );
         
         vm.stopBroadcast();
@@ -149,6 +154,7 @@ contract DeployConferenceFactoryLocal is Script {
  *   CONFERENCE_DEPOSIT - Deposit amount in wei (default: 0.02 ether)
  *   CONFERENCE_LIMIT - Max participants (default: 20)
  *   CONFERENCE_COOLING_PERIOD - Cooling period in seconds (default: 1 week)
+ *   METADATA_URI - Arweave URI for off-chain metadata (e.g., "ar://txId")
  * 
  * Usage:
  *   FACTORY_ADDRESS=0x... forge script script/Deploy.s.sol:CreateConferenceViaFactory --broadcast --rpc-url <RPC_URL> --private-key <KEY>
@@ -160,6 +166,7 @@ contract CreateConferenceViaFactory is Script {
         uint256 deposit = vm.envOr("CONFERENCE_DEPOSIT", uint256(0.02 ether));
         uint256 limitOfParticipants = vm.envOr("CONFERENCE_LIMIT", uint256(20));
         uint256 coolingPeriod = vm.envOr("CONFERENCE_COOLING_PERIOD", uint256(1 weeks));
+        string memory metadataUri = vm.envOr("METADATA_URI", string(""));
         
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
@@ -173,7 +180,8 @@ contract CreateConferenceViaFactory is Script {
             name,
             deposit,
             limitOfParticipants,
-            coolingPeriod
+            coolingPeriod,
+            metadataUri
         );
         
         vm.stopBroadcast();
@@ -188,6 +196,7 @@ contract CreateConferenceViaFactory is Script {
         console.log("Deposit:", deposit);
         console.log("Limit:", limitOfParticipants);
         console.log("Cooling Period:", coolingPeriod);
+        console.log("Metadata URI:", metadataUri);
     }
 }
 

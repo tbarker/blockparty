@@ -11,7 +11,7 @@ import Notification from './components/Notification';
 import Instruction from './components/Instruction';
 import Participants from './components/Participants';
 import NetworkLabel from './components/NetworkLabel';
-import { getArweaveMetadata } from './util/arweaveMetadata';
+import { getArweaveMetadata, clearMetadataCache } from './util/arweaveMetadata';
 
 import Avatar from '@mui/material/Avatar';
 import AppBar from '@mui/material/AppBar';
@@ -387,6 +387,43 @@ window.onload = function () {
       }
     }
 
+    // Handler for updating metadata URI (called from MetadataEditor)
+    async function updateMetadataUri(newUri) {
+      if (!contract || !signer) {
+        eventEmitter.emit('notification', { status: 'error', message: 'No wallet connected' });
+        throw new Error('No wallet connected');
+      }
+
+      eventEmitter.emit('notification', { status: 'info', message: 'Updating metadata...' });
+
+      try {
+        const contractWithSigner = contract.connect(signer);
+        const tx = await contractWithSigner.setMetadataUri(newUri);
+        await tx.wait();
+
+        // Clear the cached metadata so it will be re-fetched
+        clearMetadataCache();
+        arweaveMetadata = null;
+
+        eventEmitter.emit('notification', {
+          status: 'success',
+          message: 'Metadata updated successfully!',
+        });
+        eventEmitter.emit('change');
+
+        // Refresh the detail view
+        await getDetail();
+      } catch (error) {
+        console.error('Error updating metadata:', error);
+        const message = error.reason || error.message || 'Failed to update metadata';
+        eventEmitter.emit('notification', { status: 'error', message });
+        throw error;
+      }
+    }
+
+    // Listen for metadata update requests
+    eventEmitter.on('updateMetadataUri', updateMetadataUri);
+
     // Create an ethers-compatible wrapper for components expecting web3
     const ethersWrapper = {
       utils: {
@@ -510,6 +547,7 @@ window.onload = function () {
                 getAccounts={getAccounts}
                 getDetail={getDetail}
                 action={action}
+                provider={provider}
               />
             </>
           )}

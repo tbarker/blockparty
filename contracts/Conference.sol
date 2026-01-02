@@ -218,10 +218,10 @@ contract Conference is GroupAdmin {
     }
 
     /**
-     * @dev Set or update the metadata URI. The owner can change it as long as no one has registered yet.
+     * @dev Set or update the metadata URI. Admins can update metadata at any time to change event details.
      * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId").
      */
-    function setMetadataUri(string calldata _metadataUri) external onlyOwner noOneRegistered {
+    function setMetadataUri(string calldata _metadataUri) external onlyAdmin {
         metadataUri = _metadataUri;
         emit MetadataUpdated(_metadataUri);
     }

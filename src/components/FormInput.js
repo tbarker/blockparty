@@ -7,7 +7,9 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
+import EditIcon from '@mui/icons-material/Edit';
 import participantStatus from '../util/participantStatus';
+import MetadataEditor from './MetadataEditor';
 
 const buttonStyle = { margin: '12px' };
 
@@ -21,6 +23,7 @@ class FormInput extends React.Component {
       attendees: [],
       participants: [],
       detail: {},
+      showMetadataEditor: false,
     };
   }
 
@@ -150,6 +153,41 @@ class FormInput extends React.Component {
     });
   }
 
+  openMetadataEditor = () => {
+    this.setState({ showMetadataEditor: true });
+  };
+
+  closeMetadataEditor = () => {
+    this.setState({ showMetadataEditor: false });
+  };
+
+  handleUpdateMetadata = async metadataUri => {
+    // Emit event to update contract metadata
+    this.props.eventEmitter.emit('updateMetadataUri', metadataUri);
+  };
+
+  getCurrentMetadata() {
+    const { detail } = this.state;
+    return {
+      name: detail.name || '',
+      date: detail.date || '',
+      endDate: detail.endDate || '',
+      location: {
+        name: detail.location_text || '',
+        address: detail.location_text || '',
+        mapUrl: detail.map_url || '',
+      },
+      description: detail.description_text || '',
+      images: detail.images || {},
+      links: detail.links || {},
+    };
+  }
+
+  canEditMetadata() {
+    // Admins can edit metadata anytime the event is not ended
+    return this.isAdmin() && !this.state.detail.ended;
+  }
+
   render() {
     let adminButtons, registerButton, attendButton, warningText;
 
@@ -163,6 +201,22 @@ class FormInput extends React.Component {
           onClick={this.handleAction.bind(this, 'attend')}
         >
           Batch Attend
+        </Button>
+      );
+    }
+
+    // Edit metadata button for admins
+    let editMetadataButton = null;
+    if (this.canEditMetadata()) {
+      editMetadataButton = (
+        <Button
+          variant="outlined"
+          color="primary"
+          style={buttonStyle}
+          onClick={this.openMetadataEditor}
+          startIcon={<EditIcon />}
+        >
+          Edit Event Details
         </Button>
       );
     }
@@ -290,9 +344,20 @@ class FormInput extends React.Component {
           {registerButton}
           {withdrawButton}
           {attendButton}
+          {editMetadataButton}
           {adminButtons}
         </Box>
         {warningText}
+
+        {/* Metadata Editor Dialog */}
+        <MetadataEditor
+          open={this.state.showMetadataEditor}
+          onClose={this.closeMetadataEditor}
+          metadata={this.getCurrentMetadata()}
+          provider={this.props.provider}
+          onUpdateContract={this.handleUpdateMetadata}
+          eventName={this.state.detail.name}
+        />
       </Paper>
     );
   }

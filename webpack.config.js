@@ -9,6 +9,12 @@ module.exports = {
     path: path.resolve(__dirname, 'build'),
     filename: 'app.js',
   },
+  // Exclude Irys packages from bundling - they will be loaded dynamically at runtime
+  // These packages have complex ESM/CJS dependencies that cause webpack build issues
+  externals: {
+    '@irys/web-upload': 'commonjs @irys/web-upload',
+    '@irys/web-upload-ethereum': 'commonjs @irys/web-upload-ethereum',
+  },
   plugins: [
     // Provide polyfills for Node.js core modules (required by ethers.js)
     new webpack.ProvidePlugin({

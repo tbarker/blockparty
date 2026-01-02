@@ -459,19 +459,66 @@ contract ConferenceMetadataUriTest is ConferenceUpgradeableBaseTest {
         conferenceProxy.setMetadataUri("ar://newUri456");
     }
     
-    function test_NonOwnerCannotSetMetadataUri() public {
+    function test_AdminCanSetMetadataUri() public {
+        // Grant admin rights
+        address[] memory admins = new address[](1);
+        admins[0] = admin;
+        vm.prank(conferenceOwner);
+        conferenceProxy.grant(admins);
+        
+        // Admin updates metadata
+        vm.prank(admin);
+        conferenceProxy.setMetadataUri("ar://adminUri789");
+        
+        assertEq(conferenceProxy.metadataUri(), "ar://adminUri789");
+    }
+    
+    function test_NonAdminCannotSetMetadataUri() public {
         vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert("GroupAdmin: caller is not an admin");
         conferenceProxy.setMetadataUri("ar://newUri456");
     }
     
-    function test_CannotSetMetadataUriAfterRegistration() public {
+    function test_CanSetMetadataUriAfterRegistration() public {
         vm.prank(participant1);
         conferenceProxy.register{value: deposit}(TWITTER_HANDLE);
         
+        // Owner can still update metadata after registration
         vm.prank(conferenceOwner);
-        vm.expectRevert("Conference: participants already registered");
-        conferenceProxy.setMetadataUri("ar://newUri456");
+        conferenceProxy.setMetadataUri("ar://updatedAfterReg");
+        
+        assertEq(conferenceProxy.metadataUri(), "ar://updatedAfterReg");
+    }
+    
+    function test_AdminCanSetMetadataUriAfterRegistration() public {
+        // Grant admin rights
+        address[] memory admins = new address[](1);
+        admins[0] = admin;
+        vm.prank(conferenceOwner);
+        conferenceProxy.grant(admins);
+        
+        // Register participant
+        vm.prank(participant1);
+        conferenceProxy.register{value: deposit}(TWITTER_HANDLE);
+        
+        // Admin can still update metadata after registration
+        vm.prank(admin);
+        conferenceProxy.setMetadataUri("ar://adminUpdatedAfterReg");
+        
+        assertEq(conferenceProxy.metadataUri(), "ar://adminUpdatedAfterReg");
+    }
+    
+    function test_MultipleMetadataUpdates() public {
+        vm.startPrank(conferenceOwner);
+        conferenceProxy.setMetadataUri("ar://version1");
+        assertEq(conferenceProxy.metadataUri(), "ar://version1");
+        
+        conferenceProxy.setMetadataUri("ar://version2");
+        assertEq(conferenceProxy.metadataUri(), "ar://version2");
+        
+        conferenceProxy.setMetadataUri("ar://version3");
+        assertEq(conferenceProxy.metadataUri(), "ar://version3");
+        vm.stopPrank();
     }
 }
 

@@ -1,16 +1,18 @@
 import './stylesheets/app.css';
-import React from 'react';
+import React, { useState } from 'react';
 import EventEmitter from 'event-emitter';
 import { createRoot } from 'react-dom/client';
 import { ethers } from 'ethers';
 // Use Forge output for contract ABI
 import ConferenceArtifact from '../out/Conference.sol/Conference.json';
+import ConferenceFactoryArtifact from '../out/ConferenceFactory.sol/ConferenceFactory.json';
 import ConferenceDetail from './components/ConferenceDetail';
 import FormInput from './components/FormInput';
 import Notification from './components/Notification';
 import Instruction from './components/Instruction';
 import Participants from './components/Participants';
 import NetworkLabel from './components/NetworkLabel';
+import NewEventDialog from './components/NewEventDialog';
 import { getArweaveMetadata, clearMetadataCache } from './util/arweaveMetadata';
 
 import Avatar from '@mui/material/Avatar';
@@ -30,8 +32,9 @@ const theme = createTheme({
   },
 });
 
-// Conference contract ABI from Forge output
+// Contract ABIs from Forge output
 const ConferenceABI = ConferenceArtifact.abi;
+const ConferenceFactoryABI = ConferenceFactoryArtifact.abi;
 
 async function setup() {
   let provider;
@@ -153,9 +156,31 @@ window.onload = function () {
     // Metadata will be fetched from Arweave when getDetail() is called
     let arweaveMetadata = null;
 
+    // Factory contract setup
+    let factory = null;
+    let factoryAvailable = false;
+    const factoryAddress =
+      network_obj?.factory_address ||
+      process.env.FACTORY_ADDRESS ||
+      (window.__E2E_CONFIG__ && window.__E2E_CONFIG__.factoryAddress);
+
+    if (factoryAddress && ethers.isAddress(factoryAddress)) {
+      try {
+        const factoryRunner = signer || provider;
+        factory = new ethers.Contract(factoryAddress, ConferenceFactoryABI, factoryRunner);
+        factoryAvailable = true;
+        console.log('Factory connected at:', factoryAddress);
+      } catch (e) {
+        console.error('Error connecting to factory:', e);
+      }
+    } else {
+      console.log('No factory address configured');
+    }
+
     window.contract = contract;
     window.provider = provider;
     window.signer = signer;
+    window.factory = factory;
     const eventEmitter = EventEmitter();
 
     // Helper function to get balance using ethers
@@ -424,6 +449,63 @@ window.onload = function () {
     // Listen for metadata update requests
     eventEmitter.on('updateMetadataUri', updateMetadataUri);
 
+    // Handler for creating new conference via factory
+    async function createConference(params) {
+      if (!factory || !signer) {
+        throw new Error('Factory not available or no wallet connected');
+      }
+
+      const factoryWithSigner = factory.connect(signer);
+
+      // Parse deposit to wei
+      const depositWei = ethers.parseEther(params.deposit);
+
+      console.log('Creating conference with params:', {
+        name: params.name,
+        deposit: depositWei.toString(),
+        limitOfParticipants: params.limitOfParticipants,
+        coolingPeriod: params.coolingPeriod,
+        metadataUri: params.metadataUri,
+      });
+
+      const tx = await factoryWithSigner.createConference(
+        params.name,
+        depositWei,
+        params.limitOfParticipants,
+        params.coolingPeriod,
+        params.metadataUri || ''
+      );
+
+      const receipt = await tx.wait();
+
+      // Parse the ConferenceCreated event to get the new contract address
+      // Event signature: ConferenceCreated(address indexed conferenceProxy, address indexed owner, string name, ...)
+      const conferenceCreatedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = factory.interface.parseLog({ topics: log.topics, data: log.data });
+          return parsed && parsed.name === 'ConferenceCreated';
+        } catch {
+          return false;
+        }
+      });
+
+      if (conferenceCreatedEvent) {
+        const parsed = factory.interface.parseLog({
+          topics: conferenceCreatedEvent.topics,
+          data: conferenceCreatedEvent.data,
+        });
+        const newAddress = parsed.args.conferenceProxy || parsed.args[0];
+        console.log('New conference created at:', newAddress);
+        return newAddress;
+      }
+
+      // Fallback: try to get the latest conference from the factory
+      const conferenceCount = await factory.conferenceCount();
+      const newAddress = await factory.conferences(conferenceCount - 1n);
+      console.log('New conference created at (fallback):', newAddress);
+      return newAddress;
+    }
+
     // Create an ethers-compatible wrapper for components expecting web3
     const ethersWrapper = {
       utils: {
@@ -453,107 +535,143 @@ window.onload = function () {
       },
     };
 
-    const App = () => (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Box>
-          <AppBar position="static" sx={{ backgroundColor: '#607D8B' }}>
-            <Toolbar>
-              <Avatar
-                src={require('./images/nightclub-white.png')}
-                sx={{ width: 50, height: 50, bgcolor: 'rgb(96, 125, 139)', mr: 2 }}
-              />
-              <Typography
-                variant="h4"
-                component="div"
-                sx={{
-                  flexGrow: 1,
-                  textAlign: 'center',
-                  fontFamily: 'Lobster, cursive',
-                }}
-              >
-                Block Party
+    const App = () => {
+      const [showNewEventDialog, setShowNewEventDialog] = useState(false);
+
+      return (
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Box>
+            <AppBar position="static" sx={{ backgroundColor: '#607D8B' }}>
+              <Toolbar>
+                <Avatar
+                  src={require('./images/nightclub-white.png')}
+                  sx={{ width: 50, height: 50, bgcolor: 'rgb(96, 125, 139)', mr: 2 }}
+                />
                 <Typography
-                  component="span"
-                  sx={{ fontSize: 'small', fontFamily: 'sans-serif', ml: 1 }}
+                  variant="h4"
+                  component="div"
+                  sx={{
+                    flexGrow: 1,
+                    textAlign: 'center',
+                    fontFamily: 'Lobster, cursive',
+                  }}
                 >
-                  - NO BLOCK NO PARTY -
+                  Block Party
+                  <Typography
+                    component="span"
+                    sx={{ fontSize: 'small', fontFamily: 'sans-serif', ml: 1 }}
+                  >
+                    - NO BLOCK NO PARTY -
+                  </Typography>
                 </Typography>
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <NetworkLabel eventEmitter={eventEmitter} read_only={read_only} />
-                <Button sx={{ color: 'white' }} onClick={() => eventEmitter.emit('instruction')}>
-                  About
-                </Button>
-              </Box>
-            </Toolbar>
-          </AppBar>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <NetworkLabel eventEmitter={eventEmitter} read_only={read_only} />
+                  {!read_only && (
+                    <Button
+                      variant="outlined"
+                      sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}
+                      onClick={() => setShowNewEventDialog(true)}
+                    >
+                      + New Event
+                    </Button>
+                  )}
+                  <Button sx={{ color: 'white' }} onClick={() => eventEmitter.emit('instruction')}>
+                    About
+                  </Button>
+                </Box>
+              </Toolbar>
+            </AppBar>
 
-          <Instruction eventEmitter={eventEmitter} />
-          <Notification eventEmitter={eventEmitter} />
+            <Instruction eventEmitter={eventEmitter} />
+            <Notification eventEmitter={eventEmitter} />
 
-          {contractError ? (
-            <Box
-              className="container"
-              sx={{
-                textAlign: 'center',
-                py: 8,
-                px: 2,
-              }}
-            >
-              <Typography variant="h5" color="error" gutterBottom>
-                {contractError}
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
-                To view an event, add the contract address to the URL:
-              </Typography>
-              <Typography
-                variant="body2"
+            {contractError ? (
+              <Box
+                className="container"
                 sx={{
-                  mt: 1,
-                  fontFamily: 'monospace',
-                  backgroundColor: '#f5f5f5',
-                  p: 2,
-                  borderRadius: 1,
-                  display: 'inline-block',
+                  textAlign: 'center',
+                  py: 8,
+                  px: 2,
                 }}
               >
-                {window.location.origin}
-                {window.location.pathname}?contract=0x...
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <Box className="container foo">
-                <ConferenceDetail
-                  eventEmitter={eventEmitter}
-                  getDetail={getDetail}
-                  web3={ethersWrapper}
-                  contract={contract}
-                  contractAddress={contractAddress}
-                />
-                <Participants
-                  eventEmitter={eventEmitter}
-                  getDetail={getDetail}
-                  getParticipants={getParticipants}
-                  getAccounts={getAccounts}
-                  action={action}
-                  web3={ethersWrapper}
-                />
+                <Typography variant="h5" color="error" gutterBottom>
+                  {contractError}
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mt: 2 }}>
+                  To view an event, add the contract address to the URL:
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    mt: 1,
+                    fontFamily: 'monospace',
+                    backgroundColor: '#f5f5f5',
+                    p: 2,
+                    borderRadius: 1,
+                    display: 'inline-block',
+                  }}
+                >
+                  {window.location.origin}
+                  {window.location.pathname}?contract=0x...
+                </Typography>
+                {!read_only && factoryAvailable && (
+                  <Box sx={{ mt: 4 }}>
+                    <Typography variant="body1" color="text.secondary" gutterBottom>
+                      Or create a new event:
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      onClick={() => setShowNewEventDialog(true)}
+                      sx={{ mt: 1 }}
+                    >
+                      + Create New Event
+                    </Button>
+                  </Box>
+                )}
               </Box>
-              <FormInput
-                read_only={read_only}
-                eventEmitter={eventEmitter}
-                getAccounts={getAccounts}
-                getDetail={getDetail}
-                action={action}
-                provider={provider}
-              />
-            </>
-          )}
-        </Box>
-      </ThemeProvider>
-    );
+            ) : (
+              <>
+                <Box className="container foo">
+                  <ConferenceDetail
+                    eventEmitter={eventEmitter}
+                    getDetail={getDetail}
+                    web3={ethersWrapper}
+                    contract={contract}
+                    contractAddress={contractAddress}
+                  />
+                  <Participants
+                    eventEmitter={eventEmitter}
+                    getDetail={getDetail}
+                    getParticipants={getParticipants}
+                    getAccounts={getAccounts}
+                    action={action}
+                    web3={ethersWrapper}
+                  />
+                </Box>
+                <FormInput
+                  read_only={read_only}
+                  eventEmitter={eventEmitter}
+                  getAccounts={getAccounts}
+                  getDetail={getDetail}
+                  action={action}
+                  provider={provider}
+                />
+              </>
+            )}
+
+            {/* New Event Dialog */}
+            <NewEventDialog
+              open={showNewEventDialog}
+              onClose={() => setShowNewEventDialog(false)}
+              provider={provider}
+              onCreateEvent={createConference}
+              factoryAvailable={factoryAvailable}
+            />
+          </Box>
+        </ThemeProvider>
+      );
+    };
 
     const container = document.getElementById('app');
     const root = createRoot(container);

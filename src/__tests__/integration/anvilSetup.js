@@ -5,11 +5,14 @@
  * Usage:
  *   1. Start Anvil in a separate terminal: npm run anvil
  *   2. Run integration tests: npm run test:integration
+ *
+ * In CI environments, Anvil will be started automatically if not already running.
  */
 
 const { ethers } = require('ethers');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // Anvil default accounts (well-known test keys)
 const ANVIL_ACCOUNTS = {
@@ -49,12 +52,15 @@ const DEFAULT_DEPOSIT = ethers.parseEther('0.02');
 // Note: Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
 const TEST_CONFIG = {
   rpcUrl: 'http://127.0.0.1:8545',
-  chainId: 31337, // Anvil default chain ID
+  chainId: 1337,
   defaultEventName: 'Integration Test Event',
   defaultDeposit: DEFAULT_DEPOSIT,
   defaultLimit: 20,
   defaultCoolingPeriod: 60 * 60 * 24 * 7, // 1 week in seconds
 };
+
+// Track if we started Anvil ourselves (so we can clean it up)
+let anvilProcess = null;
 
 let artifacts;
 
@@ -105,10 +111,99 @@ async function isAnvilRunning() {
   try {
     const provider = createProvider();
     const network = await provider.getNetwork();
-    return Number(network.chainId) === TEST_CONFIG.chainId;
+    const chainId = Number(network.chainId);
+    return chainId === TEST_CONFIG.chainId;
   } catch {
     return false;
   }
+}
+
+/**
+ * Start Anvil process (for CI environments)
+ * Returns a promise that resolves when Anvil is ready
+ */
+async function startAnvil() {
+  return new Promise((resolve, reject) => {
+    anvilProcess = spawn('anvil', ['--chain-id', String(TEST_CONFIG.chainId)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false,
+    });
+
+    let started = false;
+
+    anvilProcess.stdout.on('data', data => {
+      const output = data.toString();
+      // Anvil prints "Listening on 127.0.0.1:8545" when ready
+      if (!started && output.includes('Listening on')) {
+        started = true;
+        resolve();
+      }
+    });
+
+    anvilProcess.stderr.on('data', data => {
+      // Anvil may output startup info to stderr
+      const output = data.toString();
+      if (!started && output.includes('Listening on')) {
+        started = true;
+        resolve();
+      }
+    });
+
+    anvilProcess.on('error', err => {
+      reject(new Error(`Failed to start Anvil: ${err.message}`));
+    });
+
+    anvilProcess.on('exit', code => {
+      if (!started) {
+        reject(new Error(`Anvil exited with code ${code} before starting`));
+      }
+    });
+
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      if (!started) {
+        if (anvilProcess) {
+          anvilProcess.kill();
+        }
+        reject(new Error('Anvil failed to start within 30 seconds'));
+      }
+    }, 30000);
+  });
+}
+
+/**
+ * Stop Anvil process if we started it
+ */
+function stopAnvil() {
+  if (anvilProcess) {
+    anvilProcess.kill();
+    anvilProcess = null;
+  }
+}
+
+/**
+ * Ensure Anvil is running, starting it if necessary (for CI)
+ * Returns true if Anvil was started by this function
+ */
+async function ensureAnvilRunning() {
+  const running = await isAnvilRunning();
+  if (running) {
+    return false; // Anvil was already running
+  }
+
+  // In CI or when AUTO_START_ANVIL is set, start Anvil automatically
+  if (process.env.CI || process.env.AUTO_START_ANVIL) {
+    await startAnvil();
+    // Give Anvil a moment to fully initialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return true; // We started Anvil
+  }
+
+  // Not in CI and Anvil not running - throw error with instructions
+  throw new Error(
+    'Anvil is not running. Start it with: npm run anvil\n' +
+      'Then run tests with: npm run test:integration'
+  );
 }
 
 /**
@@ -375,6 +470,9 @@ module.exports = {
   getSigner,
   getAddress,
   isAnvilRunning,
+  ensureAnvilRunning,
+  startAnvil,
+  stopAnvil,
   resetAnvil,
 
   // Contract interactions

@@ -27,20 +27,26 @@ const {
   getParticipant,
   getAddress,
   getSigner,
-  isAnvilRunning,
+  ensureAnvilRunning,
+  stopAnvil,
   resetAnvil,
   advanceTime,
   DEFAULT_DEPOSIT,
 } = require('./anvilSetup');
 
 describe('Admin Workflow Integration Tests', () => {
+  // Track if we started Anvil ourselves
+  let weStartedAnvil = false;
+
+  // Ensure Anvil is running before all tests (will auto-start in CI)
   beforeAll(async () => {
-    const running = await isAnvilRunning();
-    if (!running) {
-      throw new Error(
-        'Anvil is not running. Start it with: npm run anvil\n' +
-          'Then run tests with: npm run test:integration'
-      );
+    weStartedAnvil = await ensureAnvilRunning();
+  });
+
+  // Clean up Anvil if we started it
+  afterAll(() => {
+    if (weStartedAnvil) {
+      stopAnvil();
     }
   });
 

@@ -112,13 +112,10 @@ jobs:
       - name: Build contracts
         run: forge build
 
-      - name: Start Anvil
-        run: |
-          anvil --chain-id 1337 &
-          sleep 3
-
       - name: Run integration tests
         run: npm run test:integration
+        env:
+          CI: true
 
   e2e:
     name: E2E Tests (Synpress)

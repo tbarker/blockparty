@@ -24,21 +24,26 @@ const {
   getAddress,
   getSigner,
   getBalance,
-  isAnvilRunning,
+  ensureAnvilRunning,
+  stopAnvil,
   resetAnvil,
   DEFAULT_DEPOSIT,
   createProvider,
 } = require('./anvilSetup');
 
 describe('User Journey Integration Tests', () => {
-  // Check if Anvil is running before all tests
+  // Track if we started Anvil ourselves
+  let weStartedAnvil = false;
+
+  // Ensure Anvil is running before all tests (will auto-start in CI)
   beforeAll(async () => {
-    const running = await isAnvilRunning();
-    if (!running) {
-      throw new Error(
-        'Anvil is not running. Start it with: npm run anvil\n' +
-          'Then run tests with: npm run test:integration'
-      );
+    weStartedAnvil = await ensureAnvilRunning();
+  });
+
+  // Clean up Anvil if we started it
+  afterAll(() => {
+    if (weStartedAnvil) {
+      stopAnvil();
     }
   });
 

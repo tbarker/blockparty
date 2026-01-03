@@ -187,20 +187,114 @@ npm run synpress:cache:force
 
 ### Running Locally
 
+#### One-Command Startup (Recommended)
+
+The easiest way to run a local development environment:
+
 ```bash
-# Start local Ethereum node (Anvil) with chain ID 1337
-anvil --chain-id 1337
-# Or use npm script:
+npm run dev:local
+```
+
+This single command:
+
+1. Starts Anvil (local Ethereum node) on port 8545
+2. Deploys the ConferenceFactory and an initial Conference contract
+3. Starts the dev server at http://localhost:3000
+4. Automatically configures Arweave devnet mode for testing uploads
+
+**MetaMask Setup for Local Development:**
+
+| Setting         | Value                   |
+| --------------- | ----------------------- |
+| Network Name    | `Localhost 8545`        |
+| RPC URL         | `http://localhost:8545` |
+| Chain ID        | `1337`                  |
+| Currency Symbol | `ETH`                   |
+
+Import Anvil's pre-funded test account:
+
+- **Address:** `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+- **Private Key:** `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+- Pre-funded with 10,000 ETH
+
+#### Manual Startup
+
+For more control, you can start each component separately:
+
+```bash
+# Terminal 1: Start local Ethereum node (Anvil) with chain ID 1337
 npm run anvil
 
-# Deploy contracts (in a new terminal)
-forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545
+# Terminal 2: Deploy contracts
+npm run deploy:local
 
-# Start dev server at http://localhost:8080
+# Terminal 3: Start dev server at http://localhost:8080
 CONTRACT_ADDRESS=<deployed-address> npm run dev
 ```
 
 NOTE: MetaMask accounts won't have Ether on Anvil. Use incognito mode to use Anvil's default funded accounts, or import one of Anvil's private keys.
+
+### Arweave Testnet (Devnet) for Metadata
+
+BlockParty uses [Irys](https://irys.xyz) to upload event metadata to Arweave for permanent, decentralized storage. For testing, use **devnet mode** which:
+
+- Uses Sepolia testnet tokens (free)
+- Data expires after ~60 days (not permanent)
+- Great for testing before mainnet uploads
+
+#### Automatic Devnet Mode
+
+When running `npm run dev:local` or connecting to localhost (chain ID 1337), devnet mode is automatically enabled. You can verify this in the browser console:
+
+```javascript
+// Check current mode
+localStorage.getItem('irys_devnet'); // Returns 'true' for devnet
+
+// Manually enable/disable
+localStorage.setItem('irys_devnet', 'true'); // Enable devnet
+localStorage.removeItem('irys_devnet'); // Use auto-detection
+```
+
+#### CLI Metadata Upload
+
+For uploading metadata via CLI, you need a wallet with Sepolia ETH for devnet, or mainnet ETH for production.
+
+**Environment Variables:**
+
+| Variable              | Description                             |
+| --------------------- | --------------------------------------- |
+| `ARWEAVE_SEED_PHRASE` | Seed phrase (12/24 words) - recommended |
+| `ARWEAVE_PRIVATE_KEY` | Ethereum private key (0x...)            |
+| `PRIVATE_KEY`         | Legacy: same as ARWEAVE_PRIVATE_KEY     |
+| `RPC_URL`             | RPC endpoint (required for devnet)      |
+
+**Usage:**
+
+```bash
+# Set your Sepolia wallet credentials (use seed phrase)
+export ARWEAVE_SEED_PHRASE="word1 word2 word3 ... word12"
+
+# Or use private key
+export ARWEAVE_PRIVATE_KEY=0x...your-private-key...
+
+# Dry run (check costs without uploading)
+npm run upload:metadata:dry-run -- ./metadata/example/metadata.json
+
+# Upload to devnet (Sepolia - free, temporary)
+RPC_URL=https://rpc.sepolia.org npm run upload:metadata:devnet -- ./metadata/example/metadata.json
+
+# Upload to mainnet (costs real ETH - use for production)
+npm run upload:metadata -- ./metadata/example/metadata.json
+```
+
+**Getting Sepolia Test ETH:**
+
+1. Visit a Sepolia faucet:
+   - https://sepoliafaucet.com
+   - https://faucets.chain.link/sepolia
+   - https://www.alchemy.com/faucets/ethereum-sepolia
+2. Enter your wallet address
+3. Wait for the test ETH to arrive (~30 seconds)
 
 ### Contract Deployment
 

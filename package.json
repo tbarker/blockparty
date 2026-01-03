@@ -33,6 +33,7 @@
     "synpress:cache:force": "xvfb-run npx synpress src/__tests__/e2e-synpress/wallet-setup --force",
     "start": "webpack serve --mode development --port 3000",
     "dev": "webpack serve --mode development",
+    "dev:local": "node scripts/dev-local.js",
     "anvil": "anvil --chain-id 1337",
     "deploy:local": "forge script script/Deploy.s.sol:DeployConferenceLocal --broadcast --rpc-url http://localhost:8545 --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
     "build-contracts": "forge build",

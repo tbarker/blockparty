@@ -9,10 +9,12 @@
     "ghcr.io/danzilberdan/devcontainers/opencode:0": {}
   },
   "forwardPorts": [8545, 8080, 3000],
+  "appPort": ["8545:8545"],
   "portsAttributes": {
     "8545": {
       "label": "Ethereum RPC (Anvil/Ganache)",
-      "onAutoForward": "notify"
+      "onAutoForward": "notify",
+      "protocol": "http"
     },
     "8080": {
       "label": "Webpack Dev Server",

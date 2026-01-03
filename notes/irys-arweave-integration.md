@@ -119,7 +119,8 @@ The UI fetches metadata from Arweave:
   "@irys/upload": "^0.0.15",
   "@irys/upload-ethereum": "^0.0.16",
   "@irys/web-upload": "^0.0.15",
-  "@irys/web-upload-ethereum": "^0.0.16"
+  "@irys/web-upload-ethereum": "^0.0.16",
+  "@irys/web-upload-ethereum-ethers-v6": "^0.0.4"
 }
 ```
 
@@ -147,6 +148,43 @@ dependencies that require special webpack configuration:
 
 These settings are in `webpack.config.js` and enable browser-based Arweave uploads via
 the UI in addition to the CLI tool.
+
+---
+
+## Network-Aware Upload Behavior
+
+The UI (`src/util/arweaveUpload.js`) automatically selects the appropriate Irys network
+based on the connected chain:
+
+| Chain ID | Network          | Irys Mode | RPC Used     |
+| -------- | ---------------- | --------- | ------------ |
+| 1        | Ethereum Mainnet | Mainnet   | Wallet's RPC |
+| 11155111 | Sepolia          | Devnet    | Sepolia RPC  |
+| 1337     | Local (Anvil)    | Devnet    | Sepolia RPC  |
+| 31337    | Hardhat          | Devnet    | Sepolia RPC  |
+
+### Environment Variables
+
+- `SEPOLIA_RPC_URL`: Custom Sepolia RPC URL for devnet mode (default: `https://rpc.sepolia.org`)
+
+### E2E Test Behavior
+
+Arweave uploads are automatically **disabled** during E2E tests (when `window.__E2E_CONFIG__`
+is present). This ensures E2E tests don't require Sepolia ETH and complete quickly.
+
+### Ethers v6 Compatibility
+
+The app uses ethers v6 (`BrowserProvider`), but the base Irys SDK expects ethers v5 (`Web3Provider`).
+This is handled by using `@irys/web-upload-ethereum-ethers-v6` with `EthersV6Adapter`:
+
+```js
+import { EthersV6Adapter } from '@irys/web-upload-ethereum-ethers-v6';
+
+const irysUploader = await WebUploader(WebEthereum)
+  .withAdapter(EthersV6Adapter(provider))
+  .withRpc(sepoliaRpcUrl) // Required for devnet
+  .devnet(); // Use devnet bundler
+```
 
 ---
 

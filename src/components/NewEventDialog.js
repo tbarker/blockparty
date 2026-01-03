@@ -39,6 +39,7 @@ const COOLING_PERIODS = [
  *   open: boolean - Whether the dialog is open
  *   onClose: function - Called when dialog should close
  *   provider: object - ethers.js provider
+ *   networkId: string - The connected network's chain ID
  *   onCreateEvent: function(params) - Called to create the event contract
  *   factoryAvailable: boolean - Whether factory contract is available
  */
@@ -80,9 +81,17 @@ class NewEventDialog extends Component {
     this.checkUploadAvailability();
   }
 
+  componentDidUpdate(prevProps) {
+    // Re-check upload availability when networkId changes
+    if (prevProps.networkId !== this.props.networkId) {
+      this.checkUploadAvailability();
+    }
+  }
+
   async checkUploadAvailability() {
     try {
-      const available = await isUploadAvailable();
+      const { networkId } = this.props;
+      const available = await isUploadAvailable(networkId);
       this.setState({ uploadAvailable: available });
     } catch {
       this.setState({ uploadAvailable: false });
@@ -190,7 +199,7 @@ class NewEventDialog extends Component {
   }
 
   handleSubmit = async () => {
-    const { provider, onCreateEvent } = this.props;
+    const { provider, networkId, onCreateEvent } = this.props;
 
     // Validate form
     const validationError = this.validateForm();
@@ -219,9 +228,15 @@ class NewEventDialog extends Component {
         }
 
         try {
-          metadataUri = await uploadEventMetadata(provider, metadata, imageFiles, progress => {
-            this.setState({ creationStep: progress.message });
-          });
+          metadataUri = await uploadEventMetadata(
+            provider,
+            networkId,
+            metadata,
+            imageFiles,
+            progress => {
+              this.setState({ creationStep: progress.message });
+            }
+          );
         } catch (uploadError) {
           // If upload fails, continue without metadata
           console.warn('Metadata upload failed, continuing without:', uploadError);

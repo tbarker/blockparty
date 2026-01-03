@@ -676,6 +676,7 @@ window.onload = function () {
               open={showNewEventDialog}
               onClose={() => setShowNewEventDialog(false)}
               provider={provider}
+              networkId={network_id}
               onCreateEvent={createConference}
               factoryAvailable={factoryAvailable}
             />

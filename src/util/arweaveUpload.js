@@ -4,6 +4,11 @@
  * This module provides functionality to upload event metadata and images
  * to Arweave using Irys from a browser environment with MetaMask/wallet connection.
  *
+ * Network behavior:
+ * - Mainnet (chainId 1): Uses Irys mainnet (costs real ETH)
+ * - Sepolia (chainId 11155111): Uses Irys devnet with Sepolia RPC
+ * - Local/dev (chainId 1337): Uses Irys devnet with Sepolia RPC (skipped in E2E tests)
+ *
  * NOTE: The actual Irys upload functionality requires the @irys/web-upload packages
  * which may have bundling issues with webpack. If uploads fail, users can use the
  * command-line upload script (scripts/upload-metadata.js) as an alternative.
@@ -12,16 +17,28 @@
  *   import { uploadEventMetadata, getUploadCost, isUploadAvailable } from './arweaveUpload';
  *
  *   // Check if upload is available
- *   if (await isUploadAvailable()) {
- *     const metadataUri = await uploadEventMetadata(provider, metadata, imageFiles, onProgress);
+ *   if (await isUploadAvailable(networkId)) {
+ *     const metadataUri = await uploadEventMetadata(provider, networkId, metadata, imageFiles, onProgress);
  *   }
  */
 
 // Irys gateway for viewing uploads
 const IRYS_GATEWAY = 'https://gateway.irys.xyz';
 
-// Check if we're in devnet mode (for testing)
-const isDevnet = () => {
+// Default Sepolia RPC URL (used for devnet mode)
+const DEFAULT_SEPOLIA_RPC = 'https://rpc.sepolia.org';
+
+// Get Sepolia RPC URL from environment or use default
+const getSepoliaRpcUrl = () => {
+  return process.env.SEPOLIA_RPC_URL || DEFAULT_SEPOLIA_RPC;
+};
+
+/**
+ * Determine if we should use Irys devnet based on network ID
+ * @param {string} networkId - The connected network's chain ID
+ * @returns {boolean} Whether to use devnet
+ */
+const shouldUseDevnet = networkId => {
   // Check localStorage first (explicit user setting takes precedence)
   if (typeof window !== 'undefined' && window.localStorage) {
     const stored = window.localStorage.getItem('irys_devnet');
@@ -30,27 +47,55 @@ const isDevnet = () => {
     }
   }
 
-  // Auto-detect development environment (localhost)
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    if (isLocalhost) {
+  // Network-based detection
+  switch (networkId) {
+    case '1':
+      // Ethereum mainnet - use Irys mainnet
+      return false;
+    case '11155111':
+      // Sepolia testnet - use Irys devnet
       return true;
-    }
+    case '1337':
+    case '31337':
+      // Local development - use Irys devnet
+      return true;
+    default:
+      // Unknown network - check if localhost
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        if (isLocalhost) {
+          return true;
+        }
+      }
+      return false;
   }
+};
 
-  return false;
+/**
+ * Check if we're in E2E test mode
+ * @returns {boolean}
+ */
+const isE2ETest = () => {
+  return typeof window !== 'undefined' && window.__E2E_CONFIG__ !== undefined;
 };
 
 /**
  * Check if Irys upload functionality is available
+ * @param {string} networkId - The connected network's chain ID (optional)
  * @returns {Promise<boolean>}
  */
-export async function isUploadAvailable() {
+export async function isUploadAvailable(networkId) {
+  // Skip uploads during E2E tests
+  if (isE2ETest()) {
+    return false;
+  }
+
   try {
     // Try to load the SDK
     await import('@irys/web-upload');
     await import('@irys/web-upload-ethereum');
+    await import('@irys/web-upload-ethereum-ethers-v6');
     return true;
   } catch {
     return false;
@@ -59,19 +104,21 @@ export async function isUploadAvailable() {
 
 /**
  * Dynamically import Irys SDK
- * @returns {Promise<{WebUploader: Function, WebEthereum: Object}>}
+ * @returns {Promise<{WebUploader: Function, WebEthereum: Object, EthersV6Adapter: Function}>}
  * @throws {Error} If SDK cannot be loaded
  */
 async function loadIrysSDK() {
   try {
-    const [webUploadModule, webEthereumModule] = await Promise.all([
+    const [webUploadModule, webEthereumModule, ethersV6Module] = await Promise.all([
       import('@irys/web-upload'),
       import('@irys/web-upload-ethereum'),
+      import('@irys/web-upload-ethereum-ethers-v6'),
     ]);
 
     return {
       WebUploader: webUploadModule.WebUploader,
       WebEthereum: webEthereumModule.WebEthereum,
+      EthersV6Adapter: ethersV6Module.EthersV6Adapter,
     };
   } catch (error) {
     console.error('Failed to load Irys SDK:', error);
@@ -84,16 +131,26 @@ async function loadIrysSDK() {
 
 /**
  * Initialize Irys uploader with browser wallet (MetaMask/ethers provider)
- * @param {Object} provider - ethers.js BrowserProvider or similar
+ * @param {Object} provider - ethers.js v6 BrowserProvider
+ * @param {string} networkId - The connected network's chain ID
  * @returns {Object} Irys uploader instance
  */
-export async function getIrysUploader(provider) {
-  const { WebUploader, WebEthereum } = await loadIrysSDK();
+export async function getIrysUploader(provider, networkId) {
+  // Skip uploads during E2E tests
+  if (isE2ETest()) {
+    throw new Error('Arweave uploads are disabled during E2E tests');
+  }
 
-  let builder = WebUploader(WebEthereum).withProvider(provider);
+  const { WebUploader, WebEthereum, EthersV6Adapter } = await loadIrysSDK();
 
-  if (isDevnet()) {
-    builder = builder.devnet();
+  // Use EthersV6Adapter for ethers v6 compatibility
+  let builder = WebUploader(WebEthereum).withAdapter(EthersV6Adapter(provider));
+
+  // Configure devnet mode based on network
+  if (shouldUseDevnet(networkId)) {
+    const sepoliaRpc = getSepoliaRpcUrl();
+    console.log(`Using Irys devnet with Sepolia RPC: ${sepoliaRpc}`);
+    builder = builder.withRpc(sepoliaRpc).devnet();
   }
 
   const irys = await builder;
@@ -227,12 +284,13 @@ export function calculateTotalSize(metadata, imageFiles = {}) {
 /**
  * Get estimated upload cost for metadata and images
  * @param {Object} provider - ethers.js provider
+ * @param {string} networkId - The connected network's chain ID
  * @param {Object} metadata - Metadata object
  * @param {Object} imageFiles - Map of image key to File objects
  * @returns {Object} Cost estimation
  */
-export async function getUploadCost(provider, metadata, imageFiles = {}) {
-  const irys = await getIrysUploader(provider);
+export async function getUploadCost(provider, networkId, metadata, imageFiles = {}) {
+  const irys = await getIrysUploader(provider, networkId);
   const totalSize = calculateTotalSize(metadata, imageFiles);
   const price = await getPrice(irys, totalSize);
 
@@ -246,13 +304,20 @@ export async function getUploadCost(provider, metadata, imageFiles = {}) {
 /**
  * Full upload flow: upload images first, then metadata with ar:// URIs
  * @param {Object} provider - ethers.js provider
+ * @param {string} networkId - The connected network's chain ID
  * @param {Object} metadata - Metadata object (will be cloned, not mutated)
  * @param {Object} imageFiles - Map of image key to File objects (e.g., { banner: File })
  * @param {Function} onProgress - Progress callback ({ step, total, message })
  * @returns {string} Arweave URI for the metadata (ar://txId)
  */
-export async function uploadEventMetadata(provider, metadata, imageFiles = {}, onProgress) {
-  const irys = await getIrysUploader(provider);
+export async function uploadEventMetadata(
+  provider,
+  networkId,
+  metadata,
+  imageFiles = {},
+  onProgress
+) {
+  const irys = await getIrysUploader(provider, networkId);
 
   // Clone metadata to avoid mutating the original
   const updatedMetadata = JSON.parse(JSON.stringify(metadata));
@@ -362,4 +427,5 @@ export default {
   uploadEventMetadata,
   arweaveUriToGatewayUrl,
   setDevnetMode,
+  shouldUseDevnet,
 };

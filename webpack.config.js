@@ -25,6 +25,7 @@ module.exports = {
       'process.env.ENS_ADDRESS': JSON.stringify(process.env.ENS_ADDRESS),
       'process.env.CONTRACT_ADDRESS': JSON.stringify(process.env.CONTRACT_ADDRESS),
       'process.env.FACTORY_ADDRESS': JSON.stringify(process.env.FACTORY_ADDRESS),
+      'process.env.SEPOLIA_RPC_URL': JSON.stringify(process.env.SEPOLIA_RPC_URL),
     }),
     // Generate index.html with injected script tags
     new HtmlWebpackPlugin({

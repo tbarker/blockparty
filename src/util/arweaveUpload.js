@@ -22,9 +22,23 @@ const IRYS_GATEWAY = 'https://gateway.irys.xyz';
 
 // Check if we're in devnet mode (for testing)
 const isDevnet = () => {
+  // Check localStorage first (explicit user setting takes precedence)
   if (typeof window !== 'undefined' && window.localStorage) {
-    return window.localStorage.getItem('irys_devnet') === 'true';
+    const stored = window.localStorage.getItem('irys_devnet');
+    if (stored !== null) {
+      return stored === 'true';
+    }
   }
+
+  // Auto-detect development environment (localhost)
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    if (isLocalhost) {
+      return true;
+    }
+  }
+
   return false;
 };
 

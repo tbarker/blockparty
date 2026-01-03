@@ -117,9 +117,36 @@ The UI fetches metadata from Arweave:
 ```json
 {
   "@irys/upload": "^0.0.15",
-  "@irys/upload-ethereum": "^0.0.16"
+  "@irys/upload-ethereum": "^0.0.16",
+  "@irys/web-upload": "^0.0.15",
+  "@irys/web-upload-ethereum": "^0.0.16"
 }
 ```
+
+---
+
+## Webpack Bundling Notes
+
+The Irys web SDK (`@irys/web-upload` and `@irys/web-upload-ethereum`) has complex ESM/CJS
+dependencies that require special webpack configuration:
+
+1. **Module concatenation disabled**: Set `optimization.concatenateModules: false` to avoid
+   bundling issues with the `ProvidePlugin` and axios.
+
+2. **Process/browser alias**: The axios dependency in Irys imports `process/browser` without
+   the `.js` extension. Added an alias to resolve this ESM strict resolution issue:
+
+   ```js
+   alias: {
+     'process/browser': require.resolve('process/browser.js'),
+   }
+   ```
+
+3. **fullySpecified: false**: Allows imports without full file extensions, needed for
+   some ESM modules in the dependency tree.
+
+These settings are in `webpack.config.js` and enable browser-based Arweave uploads via
+the UI in addition to the CLI tool.
 
 ---
 

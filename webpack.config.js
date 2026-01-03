@@ -9,11 +9,10 @@ module.exports = {
     path: path.resolve(__dirname, 'build'),
     filename: 'app.js',
   },
-  // Exclude Irys packages from bundling - they will be loaded dynamically at runtime
-  // These packages have complex ESM/CJS dependencies that cause webpack build issues
-  externals: {
-    '@irys/web-upload': 'commonjs @irys/web-upload',
-    '@irys/web-upload-ethereum': 'commonjs @irys/web-upload-ethereum',
+  // Optimization settings to handle Irys SDK bundling issues
+  optimization: {
+    // Disable concatenation for modules that have complex ESM/CJS interop issues
+    concatenateModules: false,
   },
   plugins: [
     // Provide polyfills for Node.js core modules (required by ethers.js)
@@ -25,6 +24,7 @@ module.exports = {
     new webpack.DefinePlugin({
       'process.env.ENS_ADDRESS': JSON.stringify(process.env.ENS_ADDRESS),
       'process.env.CONTRACT_ADDRESS': JSON.stringify(process.env.CONTRACT_ADDRESS),
+      'process.env.FACTORY_ADDRESS': JSON.stringify(process.env.FACTORY_ADDRESS),
     }),
     // Generate index.html with injected script tags
     new HtmlWebpackPlugin({
@@ -50,6 +50,12 @@ module.exports = {
       child_process: false,
       vm: false,
     },
+    // Alias for process/browser (axios in Irys SDK imports without .js extension)
+    alias: {
+      'process/browser': require.resolve('process/browser.js'),
+    },
+    // Allow importing without full extension (needed for some ESM modules)
+    fullySpecified: false,
     extensions: ['.js', '.jsx', '.json'],
   },
   // Ignore critical dependency warnings from ethers.js

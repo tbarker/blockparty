@@ -11,12 +11,14 @@
  *   --dry-run    Show upload cost estimate without uploading
  *
  * Environment:
- *   PRIVATE_KEY  Ethereum private key for payment
- *   RPC_URL      RPC endpoint (required for devnet)
+ *   ARWEAVE_PRIVATE_KEY   Ethereum private key for payment (preferred)
+ *   ARWEAVE_SEED_PHRASE   Seed phrase (12/24 words) - alternative to private key
+ *   PRIVATE_KEY           Legacy: Ethereum private key for payment
+ *   RPC_URL               RPC endpoint (required for devnet)
  *
  * Example:
- *   PRIVATE_KEY=0x... node scripts/upload-metadata.js ./metadata/event/metadata.json
- *   PRIVATE_KEY=0x... RPC_URL=https://rpc.sepolia.org node scripts/upload-metadata.js ./metadata/event/metadata.json --devnet
+ *   ARWEAVE_PRIVATE_KEY=0x... node scripts/upload-metadata.js ./metadata/event/metadata.json
+ *   ARWEAVE_SEED_PHRASE="word1 word2 ..." RPC_URL=https://rpc.sepolia.org node scripts/upload-metadata.js ./metadata/event/metadata.json --devnet
  */
 
 const fs = require('fs').promises;
@@ -49,14 +51,45 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Get private key from environment variables
+ * Supports: ARWEAVE_PRIVATE_KEY, ARWEAVE_SEED_PHRASE, or legacy PRIVATE_KEY
+ */
+async function getPrivateKey() {
+  // Check for explicit Arweave private key first
+  if (process.env.ARWEAVE_PRIVATE_KEY) {
+    return process.env.ARWEAVE_PRIVATE_KEY;
+  }
+
+  // Check for seed phrase and derive private key
+  if (process.env.ARWEAVE_SEED_PHRASE) {
+    const { ethers } = await import('ethers');
+    const wallet = ethers.Wallet.fromPhrase(process.env.ARWEAVE_SEED_PHRASE);
+    console.log(`Derived wallet address from seed phrase: ${wallet.address}`);
+    return wallet.privateKey;
+  }
+
+  // Fall back to legacy PRIVATE_KEY
+  if (process.env.PRIVATE_KEY) {
+    return process.env.PRIVATE_KEY;
+  }
+
+  return null;
+}
+
 async function getIrysUploader(isDevnet) {
   // Dynamic import for ESM modules from CommonJS
   const { Uploader } = await import('@irys/upload');
   const { Ethereum } = await import('@irys/upload-ethereum');
 
-  const privateKey = process.env.PRIVATE_KEY;
+  const privateKey = await getPrivateKey();
   if (!privateKey) {
-    throw new Error('PRIVATE_KEY environment variable is required');
+    throw new Error(
+      'Wallet credentials required. Set one of:\n' +
+        '  ARWEAVE_PRIVATE_KEY  - Ethereum private key (0x...)\n' +
+        '  ARWEAVE_SEED_PHRASE  - Seed phrase (12/24 words)\n' +
+        '  PRIVATE_KEY          - Legacy: Ethereum private key'
+    );
   }
 
   let uploaderBuilder = Uploader(Ethereum).withWallet(privateKey);
@@ -164,8 +197,10 @@ async function main() {
     console.error('  --dry-run  Show cost estimate without uploading');
     console.error('');
     console.error('Environment:');
-    console.error('  PRIVATE_KEY  Ethereum private key for payment');
-    console.error('  RPC_URL      RPC endpoint (required for devnet)');
+    console.error('  ARWEAVE_PRIVATE_KEY   Ethereum private key for payment (preferred)');
+    console.error('  ARWEAVE_SEED_PHRASE   Seed phrase (12/24 words) - alternative to private key');
+    console.error('  PRIVATE_KEY           Legacy: Ethereum private key');
+    console.error('  RPC_URL               RPC endpoint (required for devnet)');
     process.exit(1);
   }
 

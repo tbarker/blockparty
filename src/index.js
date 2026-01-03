@@ -101,6 +101,17 @@ window.onload = function () {
     const network_obj =
       require('../app_config.js')[env] || require('../app_config.js')['development'];
 
+    // Auto-enable Irys devnet mode for local development (chain ID 1337)
+    if (network_id === '1337' || env === 'development') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        // Only set if not explicitly configured by user
+        if (window.localStorage.getItem('irys_devnet') === null) {
+          window.localStorage.setItem('irys_devnet', 'true');
+          console.log('Auto-enabled Arweave devnet mode for local development');
+        }
+      }
+    }
+
     let contract = null;
     let contractAddress = null;
     let contractError = null;

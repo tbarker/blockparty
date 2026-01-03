@@ -13,7 +13,8 @@ abstract contract GroupAdminUpgradeable is OwnableUpgradeable {
         address[] admins;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("blockparty.storage.GroupAdminUpgradeable")) - 1)) & ~bytes32(uint256(0xff))
+    // keccak256(abi.encode(uint256(keccak256("blockparty.storage.GroupAdminUpgradeable"))
+    // - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant GROUP_ADMIN_STORAGE_LOCATION = 
         0x8a0c9d8ec1d9f8b4c7b09d5c3b0a4f0e0d1c2b3a4958697a7b8c9d0e1f203100;
 

@@ -3,15 +3,15 @@
   "plugins": [],
   "rules": {
     "compiler-version": ["error", "^0.8.20"],
-    "func-visibility": ["warn", {"ignoreConstructors": true}],
+    "func-visibility": ["warn", { "ignoreConstructors": true }],
     "not-rely-on-time": "off",
-    "reason-string": ["warn", {"maxLength": 64}],
+    "reason-string": ["warn", { "maxLength": 64 }],
     "max-line-length": ["warn", 120],
-    "no-empty-blocks": "warn",
+    "no-empty-blocks": "off",
     "no-unused-vars": "warn",
     "state-visibility": "warn",
     "var-name-mixedcase": "warn",
-    "func-name-mixedcase": "warn",
+    "func-name-mixedcase": "off",
     "const-name-snakecase": "warn",
     "avoid-low-level-calls": "off",
     "avoid-sha3": "warn",
@@ -24,6 +24,11 @@
     "mark-callable-contracts": "off",
     "no-inline-assembly": "off",
     "no-complex-fallback": "warn",
-    "no-unused-import": "error"
+    "no-unused-import": "error",
+    "gas-custom-errors": "off",
+    "explicit-types": "off",
+    "no-global-import": "off",
+    "import-path-check": "off",
+    "immutable-vars-naming": "off"
   }
 }

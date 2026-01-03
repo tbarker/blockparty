@@ -35,7 +35,8 @@ contract ConferenceUpgradeable is Initializable, GroupAdminUpgradeable {
         mapping(uint256 => address) participantsIndex;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("blockparty.storage.ConferenceUpgradeable")) - 1)) & ~bytes32(uint256(0xff))
+    // keccak256(abi.encode(uint256(keccak256("blockparty.storage.ConferenceUpgradeable"))
+    // - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant CONFERENCE_STORAGE_LOCATION = 
         0x5b8ccbb9d4f9f6e3b2a1d0c9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e000;
 

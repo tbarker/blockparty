@@ -82,10 +82,10 @@ const isE2ETest = () => {
 
 /**
  * Check if Irys upload functionality is available
- * @param {string} networkId - The connected network's chain ID (optional)
+ * @param {string} _networkId - The connected network's chain ID (optional, reserved for future use)
  * @returns {Promise<boolean>}
  */
-export async function isUploadAvailable(networkId) {
+export async function isUploadAvailable(_networkId) {
   // Skip uploads during E2E tests
   if (isE2ETest()) {
     return false;

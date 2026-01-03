@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { uploadEventMetadata, getUploadCost, isUploadAvailable } from '../util/arweaveUpload';
+import { uploadEventMetadata, isUploadAvailable, getUploadCost } from '../util/arweaveUpload';
 import { arweaveUriToGatewayUrl } from '../util/arweaveMetadata';
 
 /**

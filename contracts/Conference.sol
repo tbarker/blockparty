@@ -54,10 +54,13 @@ contract Conference is GroupAdmin {
     /**
      * @dev Constructor.
      * @param _name The name of the event
-     * @param _deposit The amount each participant deposits. The default is set to 0.02 Ether. The amount cannot be changed once deployed.
-     * @param _limitOfParticipants The number of participant. The default is set to 20. The number can be changed by the owner of the event.
-     * @param _coolingPeriod The period participants should withdraw their deposit after the event ends. After the cooling period, the event owner can claim the remaining deposits.
-     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId"). Can be empty string.
+     * @param _deposit The amount each participant deposits. Default is 0.02 Ether.
+     *        The amount cannot be changed once deployed.
+     * @param _limitOfParticipants The number of participant. Default is 20.
+     *        The number can be changed by the owner of the event.
+     * @param _coolingPeriod The period participants should withdraw their deposit after the
+     *        event ends. After the cooling period, the owner can claim remaining deposits.
+     * @param _metadataUri The Arweave URI for off-chain metadata (e.g., "ar://txId").
      */
     constructor(
         string memory _name,

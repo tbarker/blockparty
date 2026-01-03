@@ -35,7 +35,7 @@ function cacheExists() {
       console.log(`Found Synpress cache: ${cacheDirs.map(d => d.name).join(', ')}`);
     }
     return cacheDirs.length > 0;
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 }

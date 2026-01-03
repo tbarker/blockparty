@@ -1,5 +1,5 @@
 import './stylesheets/app.css';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import EventEmitter from 'event-emitter';
 import { createRoot } from 'react-dom/client';
 import { ethers } from 'ethers';
@@ -50,7 +50,7 @@ async function setup() {
       // Request account access
       await window.ethereum.request({ method: 'eth_requestAccounts' });
       signer = await provider.getSigner();
-    } catch (error) {
+    } catch (_error) {
       console.log('User denied account access');
       read_only = true;
     }
@@ -63,7 +63,7 @@ async function setup() {
       // Test connection
       await provider.getNetwork();
       console.log('Connected to local node');
-    } catch (error) {
+    } catch (_error) {
       console.log('Local node not available, falling back to read_only mode');
       // Fallback to Infura mainnet
       const infuraUrl = 'https://mainnet.infura.io/v3/your-project-id';
@@ -74,8 +74,8 @@ async function setup() {
     try {
       const network = await provider.getNetwork();
       return { provider, signer: null, read_only, network_id: network.chainId.toString() };
-    } catch (error) {
-      console.error('Failed to get network:', error);
+    } catch (networkError) {
+      console.error('Failed to get network:', networkError);
       return { provider, signer: null, read_only: true, network_id: '1' };
     }
   }

@@ -4,31 +4,31 @@ import Button from '@mui/material/Button';
 export default class NetworkLabel extends React.Component {
   constructor(props) {
     super(props);
-    if(props.read_only){
+    if (props.read_only) {
       this.state = {
         color: 'red',
-        text: 'READONLY'
+        text: 'READONLY',
       };
-    }else{
+    } else {
       this.state = {
         color: null,
-        text: null
+        text: null,
       };
     }
 
-    if(!props.read_only){
+    if (!props.read_only) {
       this.props.eventEmitter.on('network', obj => {
-        var color ='orange';
+        var color = 'orange';
         if (obj.name == 'MAINNET') color = 'green';
         this.setState({
           color: color,
-          text: obj.name
+          text: obj.name,
         });
       });
     }
   }
 
-  render(){
+  render() {
     if (!this.state.text) {
       return null;
     }
@@ -43,7 +43,7 @@ export default class NetworkLabel extends React.Component {
           '&.Mui-disabled': {
             backgroundColor: this.state.color,
             color: 'white',
-          }
+          },
         }}
         disabled
       >

@@ -48,7 +48,10 @@ export default [
     },
     rules: {
       // Error prevention
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
       'no-console': 'off', // Allow console for DApp debugging
       'no-undef': 'error',
 
@@ -59,6 +62,8 @@ export default [
       'react/no-unescaped-entities': 'warn',
       'react/jsx-key': 'error',
       'react/jsx-no-duplicate-props': 'error',
+      'react/jsx-uses-react': 'error', // Mark React as used when JSX is present
+      'react/jsx-uses-vars': 'error', // Mark variables used in JSX as used
 
       // Code style (relaxed for legacy code)
       semi: ['error', 'always'],

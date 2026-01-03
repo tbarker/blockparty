@@ -5,17 +5,17 @@ class NameSearch extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      keyword: ''
+      keyword: '',
     };
   }
 
-  componentDidMount(){
+  componentDidMount() {
     this.props.eventEmitter.on('search', keyword => {
       this.setState({ keyword: keyword || '' });
     });
   }
 
-  handleSearchField(event){
+  handleSearchField(event) {
     this.props.eventEmitter.emit('search', event.target.value);
   }
 

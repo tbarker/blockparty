@@ -1,8 +1,11 @@
 /**
  * Global Setup for E2E Tests
  *
- * Starts Anvil and deploys the Conference contract before tests run.
- * Contract address is stored for tests to use.
+ * Starts Anvil and deploys contracts before tests run:
+ * - Conference contract (for existing event tests)
+ * - ConferenceFactory contract (for create event tests)
+ *
+ * Contract addresses are stored for tests to use.
  *
  * Uses ethers.js directly instead of forge CLI to avoid PATH issues in CI.
  */
@@ -79,11 +82,8 @@ async function startAnvil() {
  * Deploy the Conference contract using ethers.js
  * This avoids dependency on forge CLI being in PATH
  */
-async function deployContract() {
+async function deployConferenceContract(ethers, provider, wallet) {
   console.log('[E2E Setup] Deploying Conference contract...');
-
-  // Dynamic import for ethers (ESM module)
-  const { ethers } = await import('ethers');
 
   // Load the compiled contract artifact from forge output
   const projectRoot = path.join(__dirname, '../../..');
@@ -99,10 +99,6 @@ async function deployContract() {
   const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
   const abi = artifact.abi;
   const bytecode = artifact.bytecode.object;
-
-  // Connect to Anvil
-  const provider = new ethers.JsonRpcProvider(ANVIL_URL);
-  const wallet = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 
   // Deploy contract with constructor args:
   // name: "E2E Test Event"
@@ -122,7 +118,7 @@ async function deployContract() {
   await contract.waitForDeployment();
   const contractAddress = await contract.getAddress();
 
-  console.log(`[E2E Setup] Contract deployed at: ${contractAddress}`);
+  console.log(`[E2E Setup] Conference deployed at: ${contractAddress}`);
 
   // Verify the contract was actually deployed by checking its code
   const code = await provider.getCode(contractAddress);
@@ -132,7 +128,7 @@ async function deployContract() {
         'The deployment transaction may have succeeded but the contract was not created.'
     );
   }
-  console.log(`[E2E Setup] Contract verified (code length: ${code.length} chars)`);
+  console.log(`[E2E Setup] Conference verified (code length: ${code.length} chars)`);
 
   // Verify the contract is callable by reading its name
   const deployedContract = new ethers.Contract(contractAddress, abi, provider);
@@ -142,9 +138,74 @@ async function deployContract() {
       `Contract functional verification failed! Expected name "E2E Test Event" but got "${name}"`
     );
   }
-  console.log(`[E2E Setup] Contract functional test passed (name: ${name})`);
+  console.log(`[E2E Setup] Conference functional test passed (name: ${name})`);
 
   return contractAddress;
+}
+
+/**
+ * Deploy the ConferenceFactory contract using ethers.js
+ */
+async function deployFactoryContract(ethers, provider, wallet) {
+  console.log('[E2E Setup] Deploying ConferenceFactory contract...');
+
+  const projectRoot = path.join(__dirname, '../../..');
+  const artifactPath = path.join(projectRoot, 'out/ConferenceFactory.sol/ConferenceFactory.json');
+
+  if (!fs.existsSync(artifactPath)) {
+    throw new Error(
+      `Factory artifact not found at ${artifactPath}. ` +
+        'Make sure to run "forge build" before running E2E tests.'
+    );
+  }
+
+  const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
+  const abi = artifact.abi;
+  const bytecode = artifact.bytecode.object;
+
+  // Deploy factory with deployer as initial owner
+  const deployerAddress = await wallet.getAddress();
+  const factory = new ethers.ContractFactory(abi, bytecode, wallet);
+  const contract = await factory.deploy(deployerAddress);
+
+  await contract.waitForDeployment();
+  const factoryAddress = await contract.getAddress();
+
+  console.log(`[E2E Setup] ConferenceFactory deployed at: ${factoryAddress}`);
+
+  // Verify the contract was deployed
+  const code = await provider.getCode(factoryAddress);
+  if (code === '0x' || code === '0x0' || !code) {
+    throw new Error(`Factory deployment verification failed! No code at ${factoryAddress}.`);
+  }
+  console.log(`[E2E Setup] Factory verified (code length: ${code.length} chars)`);
+
+  // Verify the factory is callable
+  const deployedFactory = new ethers.Contract(factoryAddress, abi, provider);
+  const conferenceCount = await deployedFactory.conferenceCount();
+  console.log(`[E2E Setup] Factory functional test passed (conferenceCount: ${conferenceCount})`);
+
+  return factoryAddress;
+}
+
+/**
+ * Deploy all contracts needed for E2E tests
+ */
+async function deployContracts() {
+  // Dynamic import for ethers (ESM module)
+  const { ethers } = await import('ethers');
+
+  // Connect to Anvil with disabled cache to avoid nonce issues after reset
+  const provider = new ethers.JsonRpcProvider(ANVIL_URL, undefined, {
+    cacheTimeout: -1, // Disable caching to always get fresh nonces
+  });
+  const wallet = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
+
+  // Deploy both contracts
+  const contractAddress = await deployConferenceContract(ethers, provider, wallet);
+  const factoryAddress = await deployFactoryContract(ethers, provider, wallet);
+
+  return { contractAddress, factoryAddress };
 }
 
 /**
@@ -188,13 +249,14 @@ async function globalSetup() {
       }
     }
 
-    // Deploy contract
-    const contractAddress = await deployContract();
+    // Deploy contracts
+    const { contractAddress, factoryAddress } = await deployContracts();
 
     // Save state for tests
     saveState({
       anvilUrl: ANVIL_URL,
       contractAddress,
+      factoryAddress,
       chainId: 1337,
       wasAnvilRunning: alreadyRunning,
     });
@@ -210,7 +272,9 @@ async function globalSetup() {
       throw new Error('Anvil is not running after setup! Tests will fail.');
     }
 
-    console.log('[E2E Setup] Global setup complete - contract at', contractAddress);
+    console.log('[E2E Setup] Global setup complete');
+    console.log('[E2E Setup]   Conference at:', contractAddress);
+    console.log('[E2E Setup]   Factory at:', factoryAddress);
   } catch (error) {
     console.error('[E2E Setup] FATAL ERROR:', error);
     console.error('[E2E Setup] Stack trace:', error.stack);

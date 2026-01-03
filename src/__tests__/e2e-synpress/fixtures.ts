@@ -11,15 +11,25 @@ import basicSetup from './wallet-setup/basic.setup.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Load E2E state (contract address, etc.) from global setup
+// Load E2E state (contract addresses, etc.) from global setup
 const STATE_FILE = path.join(__dirname, '.e2e-state.json');
-function loadE2EState(): { contractAddress: string; chainId: number; anvilUrl: string } {
+function loadE2EState(): {
+  contractAddress: string;
+  factoryAddress: string;
+  chainId: number;
+  anvilUrl: string;
+} {
   try {
     const data = fs.readFileSync(STATE_FILE, 'utf-8');
     return JSON.parse(data);
   } catch (e) {
     console.warn('Could not load E2E state file:', e);
-    return { contractAddress: '', chainId: 1337, anvilUrl: 'http://127.0.0.1:8545' };
+    return {
+      contractAddress: '',
+      factoryAddress: '',
+      chainId: 1337,
+      anvilUrl: 'http://127.0.0.1:8545',
+    };
   }
 }
 
@@ -63,15 +73,36 @@ export async function waitForTransactionSuccess(page: any, timeout = 120000): Pr
 }
 
 /**
- * Inject E2E configuration into the page (contract address, etc.)
+ * Inject E2E configuration into the page (contract address, factory address, etc.)
  * This must be called before navigating to the app or via addInitScript
  */
 export async function injectE2EConfig(page: any): Promise<void> {
   await page.addInitScript(
-    (config: { contractAddress: string; chainId: number }) => {
+    (config: { contractAddress: string; factoryAddress: string; chainId: number }) => {
       (window as any).__E2E_CONFIG__ = config;
     },
-    { contractAddress: E2E_STATE.contractAddress, chainId: E2E_STATE.chainId }
+    {
+      contractAddress: E2E_STATE.contractAddress,
+      factoryAddress: E2E_STATE.factoryAddress,
+      chainId: E2E_STATE.chainId,
+    }
+  );
+}
+
+/**
+ * Inject E2E configuration for factory-only tests (no pre-existing contract).
+ * Used for testing the "Create New Event" flow where the app starts without a contract.
+ */
+export async function injectE2EConfigFactoryOnly(page: any): Promise<void> {
+  await page.addInitScript(
+    (config: { contractAddress: string; factoryAddress: string; chainId: number }) => {
+      (window as any).__E2E_CONFIG__ = config;
+    },
+    {
+      contractAddress: '', // No pre-existing contract
+      factoryAddress: E2E_STATE.factoryAddress,
+      chainId: E2E_STATE.chainId,
+    }
   );
 }
 
@@ -208,33 +239,47 @@ export async function connectWalletIfNeeded(
   // Wait for page to start loading and potentially trigger connection
   await page.waitForTimeout(4000);
 
-  // Check if there's a MetaMask notification popup (auto-connection request)
+  // Try to connect to dapp - MetaMask may show a popup automatically
+  // The connectToDapp method handles finding and clicking through the MetaMask UI
+  try {
+    await metamask.connectToDapp();
+    await page.waitForTimeout(2000);
+  } catch (e) {
+    // Connection may have already been approved or no popup appeared
+    console.log('First connectToDapp attempt:', (e as Error).message);
+  }
+
+  // Check if there's still a MetaMask notification popup
   const pages = context.pages();
-  const notificationPage = pages.find((p: any) => p.url().includes('notification.html#connect'));
+  const notificationPage = pages.find((p: any) => {
+    const url = p.url();
+    return url.includes('notification') || url.includes('connect');
+  });
 
   if (notificationPage) {
+    try {
+      await metamask.connectToDapp();
+      await page.waitForTimeout(2000);
+    } catch (e) {
+      // Connection may have already been approved
+      console.log('Second connectToDapp attempt:', (e as Error).message);
+    }
+  }
+
+  // Check for manual connect button on the app page
+  const connectButton = page.locator('button:has-text("Connect")');
+  const isConnectVisible = await connectButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+  if (isConnectVisible) {
+    await connectButton.click();
+    await page.waitForTimeout(2000);
+
     try {
       await metamask.connectToDapp();
     } catch (e) {
       // Connection may have already been approved
     }
-    await page.waitForTimeout(4000);
-  } else {
-    // Check for manual connect button
-    const connectButton = page.locator('button:has-text("Connect")');
-    const isConnectVisible = await connectButton.isVisible({ timeout: 6000 }).catch(() => false);
-
-    if (isConnectVisible) {
-      await connectButton.click();
-      await page.waitForTimeout(4000);
-
-      try {
-        await metamask.connectToDapp();
-      } catch (e) {
-        // Connection may have already been approved
-      }
-      await page.waitForTimeout(4000);
-    }
+    await page.waitForTimeout(2000);
   }
 
   // Return the app page (in case focus shifted during connection)

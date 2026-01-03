@@ -299,4 +299,186 @@ test.describe('Create Event Flow', () => {
     // Verify dialog is closed
     await expect(dialogTitle).not.toBeVisible({ timeout: 5000 });
   });
+
+  test('should verify Arweave upload is available when filling metadata fields', async ({
+    context,
+    page,
+    metamaskPage,
+    extensionId,
+  }) => {
+    const metamask = createMetaMask(context, metamaskPage, extensionId);
+
+    // Setup MetaMask network first
+    let appPage = await setupMetaMaskNetwork(metamask, context);
+
+    // Inject E2E config
+    await injectE2EConfigFactoryOnly(appPage);
+    await appPage.goto('http://localhost:3000/');
+
+    // Connect wallet
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await appPage.waitForLoadState('networkidle');
+    await dismissWelcomeModal(appPage);
+    await appPage.waitForTimeout(2000);
+
+    // Open dialog
+    const newEventButton = appPage.locator('button:has-text("+ New Event")');
+    await expect(newEventButton).toBeVisible({ timeout: 15000 });
+    await newEventButton.click();
+
+    // Wait for dialog to open
+    const dialogTitle = appPage.locator('h2:has-text("Create New Event")');
+    await expect(dialogTitle).toBeVisible({ timeout: 10000 });
+
+    // Wait for upload availability check to complete
+    // The component calls isUploadAvailable() on mount
+    await appPage.waitForTimeout(2000);
+
+    // Check if Arweave upload unavailable warning is shown
+    // If the Irys SDK is properly bundled, this warning should NOT appear
+    const uploadUnavailableWarning = appPage.locator(
+      '[role="alert"]:has-text("Arweave upload is not available")'
+    );
+
+    // The warning should NOT be visible if upload is available (SDK bundled correctly)
+    // This test will FAIL if the webpack config doesn't properly bundle Irys SDK
+    const isWarningVisible = await uploadUnavailableWarning.isVisible().catch(() => false);
+
+    // Assert that upload IS available (warning is NOT shown)
+    // This catches the webpack bundling issue that previously went undetected
+    expect(isWarningVisible).toBe(false);
+
+    // Also verify the metadata section header is visible
+    await expect(appPage.locator('text=Event Details (stored on Arweave)')).toBeVisible();
+
+    // Fill in metadata fields to ensure they work
+    // Date/time input
+    const dateInput = appPage
+      .locator('label:has-text("Start Date")')
+      .locator('..')
+      .locator('input');
+    if (await dateInput.isVisible()) {
+      await dateInput.fill('2026-06-15T18:00');
+    }
+
+    // Description field
+    const descriptionInput = appPage
+      .locator('label:has-text("Description")')
+      .locator('..')
+      .locator('textarea')
+      .first();
+    if (await descriptionInput.isVisible()) {
+      await descriptionInput.fill('Test event description for E2E testing');
+    }
+
+    // Location fields
+    const locationNameInput = appPage
+      .locator('label:has-text("Venue Name")')
+      .locator('..')
+      .locator('input');
+    if (await locationNameInput.isVisible()) {
+      await locationNameInput.fill('Test Venue');
+    }
+
+    // Verify that the image upload button exists (indicates upload functionality is expected)
+    // Note: MUI Button with component="label" renders as a <label> element, not <button>
+    const uploadButton = appPage.locator('label:has-text("Upload Image")');
+    await expect(uploadButton).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should create event with metadata and verify upload availability', async ({
+    context,
+    page,
+    metamaskPage,
+    extensionId,
+  }) => {
+    const metamask = createMetaMask(context, metamaskPage, extensionId);
+
+    // Setup MetaMask network first
+    let appPage = await setupMetaMaskNetwork(metamask, context);
+
+    // Inject E2E config without contract address (factory only)
+    await injectE2EConfigFactoryOnly(appPage);
+    await appPage.goto('http://localhost:3000/');
+
+    // Connect wallet
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await appPage.waitForLoadState('networkidle');
+    await dismissWelcomeModal(appPage);
+    await appPage.waitForTimeout(2000);
+
+    // Click "+ New Event" button in AppBar
+    const newEventButton = appPage.locator('button:has-text("+ New Event")');
+    await expect(newEventButton).toBeVisible({ timeout: 15000 });
+    await newEventButton.click();
+
+    // Wait for dialog to open
+    const dialogTitle = appPage.locator('h2:has-text("Create New Event")');
+    await expect(dialogTitle).toBeVisible({ timeout: 10000 });
+
+    // Wait for upload availability check
+    await appPage.waitForTimeout(2000);
+
+    // Verify Arweave upload IS available (no warning shown)
+    const uploadUnavailableWarning = appPage.locator(
+      '[role="alert"]:has-text("Arweave upload is not available")'
+    );
+    const isWarningVisible = await uploadUnavailableWarning.isVisible().catch(() => false);
+    expect(isWarningVisible).toBe(false);
+
+    // Fill in required form fields
+    const eventName = `E2E Metadata Test ${Date.now()}`;
+
+    const nameInput = appPage
+      .locator('label:has-text("Event Name")')
+      .locator('..')
+      .locator('input');
+    await nameInput.fill(eventName);
+
+    // Fill in metadata fields (this triggers the upload path when hasMetadata() returns true)
+    const descriptionInput = appPage
+      .locator('label:has-text("Description")')
+      .locator('..')
+      .locator('textarea')
+      .first();
+    if (await descriptionInput.isVisible()) {
+      await descriptionInput.fill('E2E test event with metadata');
+    }
+
+    const locationNameInput = appPage
+      .locator('label:has-text("Venue Name")')
+      .locator('..')
+      .locator('input');
+    if (await locationNameInput.isVisible()) {
+      await locationNameInput.fill('E2E Test Venue');
+    }
+
+    // Click Create Event button
+    // Note: This will attempt to upload metadata to Arweave devnet if hasMetadata() is true
+    // The upload may fail on devnet without funding, but we're testing that the SDK loads
+    const createButton = appPage.locator('button:has-text("Create Event")');
+    await expect(createButton).toBeEnabled({ timeout: 5000 });
+    await createButton.click();
+
+    // Wait for either:
+    // 1. MetaMask transaction popup (upload succeeded or was skipped)
+    // 2. An error about upload failing (which is acceptable - we tested SDK loads)
+    await appPage.waitForTimeout(3000);
+
+    // Check if we got an upload error (acceptable) or proceeded to transaction
+    const uploadError = appPage.locator('[role="alert"]:has-text("upload")');
+    const hasUploadError = await uploadError.isVisible().catch(() => false);
+
+    if (!hasUploadError) {
+      // No upload error means we're at the transaction stage
+      // Confirm transaction in MetaMask
+      await metamask.confirmTransaction();
+
+      // Wait for success state
+      const successDialog = appPage.locator('h2:has-text("Event Created Successfully!")');
+      await expect(successDialog).toBeVisible({ timeout: 120000 });
+    }
+    // If there's an upload error, that's also acceptable - it means the SDK loaded
+    // but the actual upload failed (e.g., devnet funding issue)
+  });
 });

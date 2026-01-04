@@ -86,11 +86,8 @@ const isE2ETest = () => {
  * @returns {Promise<boolean>}
  */
 export async function isUploadAvailable(_networkId) {
-  // Skip uploads during E2E tests
-  if (isE2ETest()) {
-    return false;
-  }
-
+  // Note: We check SDK availability even in E2E tests to catch webpack bundling issues.
+  // The actual upload operations are blocked in E2E mode by getIrysUploader().
   try {
     // Try to load the SDK
     await import('@irys/web-upload');

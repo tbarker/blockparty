@@ -32,6 +32,32 @@ const ANVIL_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae7
 // Track child processes for cleanup
 let anvilProcess = null;
 let devServerProcess = null;
+let isCleaningUp = false;
+
+/**
+ * Kill any existing process on a given port
+ */
+function killProcessOnPort(port) {
+  try {
+    // Get PID of process listening on port
+    const result = execSync(`lsof -t -i:${port} 2>/dev/null || true`, { encoding: 'utf-8' }).trim();
+    if (result) {
+      const pids = result.split('\n').filter(Boolean);
+      for (const pid of pids) {
+        try {
+          log(`Killing existing process ${pid} on port ${port}`);
+          process.kill(parseInt(pid, 10), 'SIGKILL');
+        } catch {
+          // Process may have already exited
+        }
+      }
+      // Brief pause to allow port to be released
+      execSync('sleep 0.5');
+    }
+  } catch {
+    // Ignore errors - port may not be in use
+  }
+}
 
 /**
  * Log a message with a prefix
@@ -117,6 +143,7 @@ function startAnvil() {
       ['--chain-id', String(ANVIL_CHAIN_ID), '--port', String(ANVIL_PORT), '--host', '0.0.0.0'],
       {
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
       }
     );
 
@@ -266,6 +293,7 @@ function startDevServer(contractAddress, factoryAddress) {
       {
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
       }
     );
 
@@ -327,22 +355,63 @@ function startDevServer(contractAddress, factoryAddress) {
 }
 
 /**
+ * Forcefully kill a child process and its children
+ */
+function killProcessTree(proc, name) {
+  if (!proc || proc.killed) return;
+
+  const pid = proc.pid;
+  log(`Stopping ${name} (PID: ${pid})...`);
+
+  try {
+    // First try SIGTERM
+    proc.kill('SIGTERM');
+
+    // Give it a moment to exit gracefully
+    setTimeout(() => {
+      if (!proc.killed) {
+        try {
+          // Try killing process group (negative PID)
+          process.kill(-pid, 'SIGKILL');
+        } catch {
+          // Try direct SIGKILL
+          try {
+            proc.kill('SIGKILL');
+          } catch {
+            // Process already dead
+          }
+        }
+      }
+    }, 500);
+  } catch {
+    // Process may have already exited
+  }
+}
+
+/**
  * Cleanup function to kill child processes
  */
 function cleanup() {
+  if (isCleaningUp) return;
+  isCleaningUp = true;
+
   log('Shutting down...');
 
   if (devServerProcess) {
-    log('Stopping dev server...');
-    devServerProcess.kill('SIGTERM');
+    killProcessTree(devServerProcess, 'dev server');
     devServerProcess = null;
   }
 
   if (anvilProcess) {
-    log('Stopping Anvil...');
-    anvilProcess.kill('SIGTERM');
+    killProcessTree(anvilProcess, 'Anvil');
     anvilProcess = null;
   }
+
+  // Final cleanup: ensure ports are free
+  setTimeout(() => {
+    killProcessOnPort(DEV_SERVER_PORT);
+    killProcessOnPort(ANVIL_PORT);
+  }, 1000);
 }
 
 /**
@@ -366,9 +435,27 @@ async function main() {
     process.exit(0);
   });
 
-  process.on('exit', cleanup);
+  process.on('uncaughtException', err => {
+    console.error('Uncaught exception:', err);
+    cleanup();
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', err => {
+    console.error('Unhandled rejection:', err);
+    cleanup();
+    process.exit(1);
+  });
+
+  // Note: Don't use process.on('exit', cleanup) as it can cause issues
+  // with async cleanup. The SIGINT/SIGTERM handlers are sufficient.
 
   try {
+    // Clean up any lingering processes from previous runs
+    log('Checking for processes on required ports...');
+    killProcessOnPort(DEV_SERVER_PORT);
+    killProcessOnPort(ANVIL_PORT);
+
     // Step 1: Start Anvil
     await startAnvil();
     console.log('');

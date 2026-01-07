@@ -40,10 +40,12 @@ async function globalTeardown() {
   const state = loadState();
 
   // Only kill Anvil if we started it
-  if (state && !state.wasAnvilRunning && global.__ANVIL_PID__) {
-    console.log(`[E2E Teardown] Stopping Anvil (PID: ${global.__ANVIL_PID__})...`);
+  // Note: We use state.anvilPid because global.__ANVIL_PID__ is not available
+  // (globalTeardown runs in a separate process from globalSetup)
+  if (state && !state.wasAnvilRunning && state.anvilPid) {
+    console.log(`[E2E Teardown] Stopping Anvil (PID: ${state.anvilPid})...`);
     try {
-      process.kill(global.__ANVIL_PID__, 'SIGTERM');
+      process.kill(state.anvilPid, 'SIGTERM');
     } catch (error) {
       // Process may have already exited
       console.log('[E2E Teardown] Anvil process already stopped');

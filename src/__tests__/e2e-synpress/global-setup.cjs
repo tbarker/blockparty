@@ -253,12 +253,14 @@ async function globalSetup() {
     const { contractAddress, factoryAddress } = await deployContracts();
 
     // Save state for tests
+    // Note: anvilPid is stored so global-teardown (which runs in a separate process) can kill it
     saveState({
       anvilUrl: ANVIL_URL,
       contractAddress,
       factoryAddress,
       chainId: 1337,
       wasAnvilRunning: alreadyRunning,
+      anvilPid: global.__ANVIL_PID__ || null,
     });
 
     // Verify state file was created

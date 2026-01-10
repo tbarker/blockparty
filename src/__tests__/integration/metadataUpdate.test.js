@@ -259,9 +259,9 @@ describe('Metadata Update Integration Tests', () => {
       expect(await contract.metadataUri()).toBe('ar://abc123xyz');
 
       // Test https:// format (for gateway URLs)
-      tx = await contract.connect(ownerSigner).setMetadataUri('https://gateway.irys.xyz/abc123xyz');
+      tx = await contract.connect(ownerSigner).setMetadataUri('https://arweave.net/abc123xyz');
       await tx.wait();
-      expect(await contract.metadataUri()).toBe('https://gateway.irys.xyz/abc123xyz');
+      expect(await contract.metadataUri()).toBe('https://arweave.net/abc123xyz');
 
       // Test ipfs:// format
       tx = await contract.connect(ownerSigner).setMetadataUri('ipfs://QmTest123');

@@ -119,6 +119,8 @@ class ConferenceDetail extends React.Component {
   getDateContent(name) {
     if (name) {
       return <span style={styles.list}>{name}</span>;
+    } else if (this.state.metadataPending) {
+      return <span style={{ ...styles.list, fontStyle: 'italic', color: '#999' }}>Loading...</span>;
     } else {
       return <span style={styles.list}>No info available</span>;
     }
@@ -177,11 +179,19 @@ class ConferenceDetail extends React.Component {
               primary={
                 <span>
                   Location
-                  <span style={styles.list}>
-                    <a target="_blank" href={this.state.map_url} rel="noreferrer">
-                      {this.state.location_text}
-                    </a>
-                  </span>
+                  {this.state.location_text ? (
+                    <span style={styles.list}>
+                      <a target="_blank" href={this.state.map_url} rel="noreferrer">
+                        {this.state.location_text}
+                      </a>
+                    </span>
+                  ) : this.state.metadataPending ? (
+                    <span style={{ ...styles.list, fontStyle: 'italic', color: '#999' }}>
+                      Loading...
+                    </span>
+                  ) : (
+                    <span style={styles.list}>No info available</span>
+                  )}
                 </span>
               }
             />
@@ -194,10 +204,18 @@ class ConferenceDetail extends React.Component {
               primary={
                 <span>
                   Description
-                  <span
-                    style={styles.list}
-                    dangerouslySetInnerHTML={{ __html: this.state.description_text }}
-                  />
+                  {this.state.description_text ? (
+                    <span
+                      style={styles.list}
+                      dangerouslySetInnerHTML={{ __html: this.state.description_text }}
+                    />
+                  ) : this.state.metadataPending ? (
+                    <span style={{ ...styles.list, fontStyle: 'italic', color: '#999' }}>
+                      Loading...
+                    </span>
+                  ) : (
+                    <span style={styles.list}>No info available</span>
+                  )}
                 </span>
               }
             />

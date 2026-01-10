@@ -26,7 +26,7 @@ import { arweaveUriToGatewayUrl } from '../util/arweaveMetadata';
  *   open: boolean - Whether the dialog is open
  *   onClose: function - Called when dialog should close
  *   metadata: object - Current metadata (name, date, location, description, images, links)
- *   provider: object - ethers.js provider for Irys uploads
+ *   provider: object - ethers.js provider for Arweave uploads
  *   onUpdateContract: function(metadataUri) - Called to update the contract with new URI
  *   eventName: string - On-chain event name (for display)
  */

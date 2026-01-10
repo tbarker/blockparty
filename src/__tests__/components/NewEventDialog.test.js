@@ -7,6 +7,7 @@ import NewEventDialog from '../../components/NewEventDialog';
 jest.mock('../../util/arweaveUpload', () => ({
   uploadEventMetadata: jest.fn(),
   isUploadAvailable: jest.fn().mockResolvedValue(true),
+  waitForArweaveConfirmation: jest.fn().mockResolvedValue(true),
 }));
 
 describe('NewEventDialog', () => {
@@ -359,5 +360,127 @@ describe('NewEventDialog', () => {
     expect(screen.getByText('Event Details (stored on Arweave)')).toBeInTheDocument();
     expect(screen.getByText('Links')).toBeInTheDocument();
     expect(screen.getByText('Banner Image')).toBeInTheDocument();
+  });
+
+  describe('Arweave confirmation', () => {
+    const { uploadEventMetadata, waitForArweaveConfirmation } = require('../../util/arweaveUpload');
+
+    beforeEach(() => {
+      uploadEventMetadata.mockReset();
+      waitForArweaveConfirmation.mockReset();
+      // Default: uploads succeed and confirmation succeeds
+      uploadEventMetadata.mockResolvedValue('ar://test-metadata-uri');
+      waitForArweaveConfirmation.mockResolvedValue(true);
+    });
+
+    // Helper to fill event name and trigger metadata by adding a venue name
+    async function fillFormWithMetadata() {
+      const textboxes = screen.getAllByRole('textbox');
+      // textboxes[0] = Event Name
+      // textboxes[1] = Venue Name (triggers hasMetadata)
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+        fireEvent.change(textboxes[1], { target: { value: 'Test Venue' } });
+      });
+    }
+
+    it('waits for Arweave confirmation after metadata upload', async () => {
+      const mockOnCreateEvent = jest.fn().mockResolvedValue('0x1234567890abcdef');
+      await renderAndWait({ onCreateEvent: mockOnCreateEvent });
+
+      await fillFormWithMetadata();
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        expect(uploadEventMetadata).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(waitForArweaveConfirmation).toHaveBeenCalledWith(
+          'ar://test-metadata-uri',
+          expect.objectContaining({
+            maxAttempts: 30,
+            intervalMs: 2000,
+          })
+        );
+      });
+
+      // Should proceed to create the event after confirmation
+      await waitFor(() => {
+        expect(mockOnCreateEvent).toHaveBeenCalled();
+      });
+    });
+
+    it('shows error and stops when Arweave confirmation times out', async () => {
+      waitForArweaveConfirmation.mockResolvedValue(false); // Simulate timeout
+
+      const mockOnCreateEvent = jest.fn().mockResolvedValue('0x1234567890abcdef');
+      await renderAndWait({ onCreateEvent: mockOnCreateEvent });
+
+      await fillFormWithMetadata();
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Arweave upload confirmation timed out/)).toBeInTheDocument();
+      });
+
+      // Should NOT create the event
+      expect(mockOnCreateEvent).not.toHaveBeenCalled();
+    });
+
+    it('shows error and stops when metadata upload fails', async () => {
+      uploadEventMetadata.mockRejectedValue(new Error('Upload network error'));
+
+      const mockOnCreateEvent = jest.fn().mockResolvedValue('0x1234567890abcdef');
+      await renderAndWait({ onCreateEvent: mockOnCreateEvent });
+
+      await fillFormWithMetadata();
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Metadata upload failed.*Upload network error/)
+        ).toBeInTheDocument();
+      });
+
+      // Should NOT create the event
+      expect(mockOnCreateEvent).not.toHaveBeenCalled();
+    });
+
+    it('skips Arweave confirmation when no metadata is provided', async () => {
+      const mockOnCreateEvent = jest.fn().mockResolvedValue('0x1234567890abcdef');
+      await renderAndWait({ onCreateEvent: mockOnCreateEvent });
+
+      // Fill in only the required name field (no metadata)
+      const textboxes = screen.getAllByRole('textbox');
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+      });
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        expect(mockOnCreateEvent).toHaveBeenCalled();
+      });
+
+      // Should NOT call upload or confirmation functions
+      expect(uploadEventMetadata).not.toHaveBeenCalled();
+      expect(waitForArweaveConfirmation).not.toHaveBeenCalled();
+    });
   });
 });

@@ -236,7 +236,7 @@ NOTE: MetaMask accounts won't have Ether on Anvil. Use incognito mode to use Anv
 
 ### Arweave Testnet (Devnet) for Metadata
 
-BlockParty uses [Irys](https://irys.xyz) to upload event metadata to Arweave for permanent, decentralized storage. For testing, use **devnet mode** which:
+BlockParty uses [ArDrive Turbo](https://ardrive.io) to upload event metadata to Arweave for permanent, decentralized storage. For testing, use **devnet mode** which:
 
 - Uses Sepolia testnet tokens (free)
 - Data expires after ~60 days (not permanent)
@@ -248,11 +248,11 @@ When running `npm run dev:local` or connecting to localhost (chain ID 1337), dev
 
 ```javascript
 // Check current mode
-localStorage.getItem('irys_devnet'); // Returns 'true' for devnet
+localStorage.getItem('turbo_devnet'); // Returns 'true' for devnet
 
 // Manually enable/disable
-localStorage.setItem('irys_devnet', 'true'); // Enable devnet
-localStorage.removeItem('irys_devnet'); // Use auto-detection
+localStorage.setItem('turbo_devnet', 'true'); // Enable devnet
+localStorage.removeItem('turbo_devnet'); // Use auto-detection
 ```
 
 #### CLI Metadata Upload

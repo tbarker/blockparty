@@ -13,7 +13,7 @@ import Instruction from './components/Instruction';
 import Participants from './components/Participants';
 import NetworkLabel from './components/NetworkLabel';
 import NewEventDialog from './components/NewEventDialog';
-import { getArweaveMetadata, clearMetadataCache } from './util/arweaveMetadata';
+import { getArweaveMetadata, clearMetadataCache, resetRetryState } from './util/arweaveMetadata';
 
 import Avatar from '@mui/material/Avatar';
 import AppBar from '@mui/material/AppBar';
@@ -36,11 +36,57 @@ const theme = createTheme({
 const ConferenceABI = ConferenceArtifact.abi;
 const ConferenceFactoryABI = ConferenceFactoryArtifact.abi;
 
+// Anvil local network configuration
+const ANVIL_CHAIN_ID = '0x539'; // 1337 in hex
+const ANVIL_NETWORK_CONFIG = {
+  chainId: ANVIL_CHAIN_ID,
+  chainName: 'Localhost 8545',
+  rpcUrls: ['http://localhost:8545'],
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+};
+
+/**
+ * Ensures MetaMask is connected to the Anvil network when running on localhost.
+ * This prevents accidental transactions on mainnet during local development.
+ */
+async function ensureCorrectNetwork() {
+  const isLocalDev = window.location.hostname === 'localhost';
+  if (!isLocalDev || typeof window.ethereum === 'undefined') return;
+
+  const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+
+  if (currentChainId !== ANVIL_CHAIN_ID) {
+    console.log(
+      `Local dev detected: switching from chain ${currentChainId} to Anvil (${ANVIL_CHAIN_ID})`
+    );
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: ANVIL_CHAIN_ID }],
+      });
+    } catch (switchError) {
+      // Error code 4902 means the chain hasn't been added to MetaMask
+      if (switchError.code === 4902) {
+        console.log('Anvil network not found in MetaMask, adding it...');
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [ANVIL_NETWORK_CONFIG],
+        });
+      } else {
+        throw switchError;
+      }
+    }
+  }
+}
+
 async function setup() {
   let provider;
   let signer = null;
   let read_only = false;
   const localUrl = 'http://localhost:8545';
+
+  // Ensure we're on the correct network for local development
+  await ensureCorrectNetwork();
 
   // Check if MetaMask or other Web3 provider is injected
   if (typeof window.ethereum !== 'undefined') {
@@ -101,12 +147,12 @@ window.onload = function () {
     const network_obj =
       require('../app_config.js')[env] || require('../app_config.js')['development'];
 
-    // Auto-enable Irys devnet mode for local development (chain ID 1337)
+    // Auto-enable Turbo devnet mode for local development (chain ID 1337)
     if (network_id === '1337' || env === 'development') {
       if (typeof window !== 'undefined' && window.localStorage) {
         // Only set if not explicitly configured by user
-        if (window.localStorage.getItem('irys_devnet') === null) {
-          window.localStorage.setItem('irys_devnet', 'true');
+        if (window.localStorage.getItem('turbo_devnet') === null) {
+          window.localStorage.setItem('turbo_devnet', 'true');
           console.log('Auto-enabled Arweave devnet mode for local development');
         }
       }
@@ -257,10 +303,19 @@ window.onload = function () {
           arweaveMetadata = await getArweaveMetadata(metadataUri);
           if (arweaveMetadata) {
             console.log('Loaded Arweave metadata:', arweaveMetadata);
+          } else {
+            console.log(
+              'Arweave metadata not yet available for:',
+              metadataUri,
+              '- will retry on next detail refresh'
+            );
           }
         }
 
         const contractBalance = await getBalance(await contract.getAddress());
+
+        // Flag to indicate if metadata is pending (URI exists but fetch failed/pending)
+        const metadataPending = !!(metadataUri && !arweaveMetadata);
 
         const detail = {
           name,
@@ -277,6 +332,7 @@ window.onload = function () {
           admins,
           contractBalance: parseFloat(ethers.formatEther(contractBalance)),
           metadataUri,
+          metadataPending, // UI can show "loading" state for metadata
           // Metadata from Arweave (or null if not available)
           date: arweaveMetadata?.date || null,
           map_url: arweaveMetadata?.map_url || null,
@@ -312,6 +368,18 @@ window.onload = function () {
         detail.contractAddress = await contract.getAddress();
         window.detail = detail;
         eventEmitter.emit('detail', detail);
+
+        // If metadata is pending, schedule a retry to fetch it
+        // This handles Arweave propagation delay after upload
+        if (detail.metadataPending) {
+          console.log('Metadata pending, scheduling retry in 3 seconds...');
+          setTimeout(() => {
+            // Reset retry state to allow immediate retry
+            resetRetryState(metadataUri);
+            arweaveMetadata = null; // Clear cached null value
+            getDetail(); // Retry fetching
+          }, 3000);
+        }
       } catch (error) {
         console.error('Error getting detail:', error);
       }

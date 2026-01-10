@@ -9,12 +9,16 @@ module.exports = {
     path: path.resolve(__dirname, 'build'),
     filename: 'app.js',
   },
-  // Optimization settings to handle Irys SDK bundling issues
+  // Optimization settings to handle SDK bundling issues
   optimization: {
     // Disable concatenation for modules that have complex ESM/CJS interop issues
     concatenateModules: false,
   },
   plugins: [
+    // Handle node: protocol imports (required by @ardrive/turbo-sdk)
+    new webpack.NormalModuleReplacementPlugin(/^node:/, resource => {
+      resource.request = resource.request.replace(/^node:/, '');
+    }),
     // Provide polyfills for Node.js core modules (required by ethers.js)
     new webpack.ProvidePlugin({
       Buffer: ['buffer', 'Buffer'],
@@ -51,7 +55,7 @@ module.exports = {
       child_process: false,
       vm: false,
     },
-    // Alias for process/browser (axios in Irys SDK imports without .js extension)
+    // Alias for process/browser (axios imports without .js extension)
     alias: {
       'process/browser': require.resolve('process/browser.js'),
     },

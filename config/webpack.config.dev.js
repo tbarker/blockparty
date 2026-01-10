@@ -1,4 +1,4 @@
-var fs = require("fs");
+var fs = require('fs');
 var path = require('path');
 var autoprefixer = require('autoprefixer');
 var webpack = require('webpack');
@@ -21,27 +21,28 @@ var publicUrl = '';
 var env = getClientEnvironment(publicUrl);
 
 var provided = {
-  "Pudding": "ether-pudding",
-  "Promise": "bluebird"
+  Pudding: 'ether-pudding',
+  Promise: 'bluebird',
 };
 
-var contracts_directory = "./build/contracts";
-fs.readdirSync("./build/contracts").forEach(function(file) {
-  if (path.basename(file).indexOf(".sol.js")) {
-    provided[path.basename(file, ".sol.js")] = path.resolve(contracts_directory + "/" + file);
+var contracts_directory = './build/contracts';
+fs.readdirSync('./build/contracts').forEach(function (file) {
+  if (path.basename(file).indexOf('.sol.js')) {
+    provided[path.basename(file, '.sol.js')] = path.resolve(contracts_directory + '/' + file);
   }
 });
-providedPlugins = new webpack.ProvidePlugin(provided)
+providedPlugins = new webpack.ProvidePlugin(provided);
 
 // This is the development configuration.
 // It is focused on developer experience and fast rebuilds.
 // The production configuration is different and lives in a separate file.
 module.exports = {
   // This makes the bundle appear split into separate modules in the devtools.
-  // We don't use source maps here because they can be confusing:
-  // https://github.com/facebookincubator/create-react-app/issues/343#issuecomment-237241875
-  // You may want 'cheap-module-source-map' instead if you prefer source maps.
-  devtool: 'eval',
+  // Using 'cheap-module-source-map' instead of 'eval' to avoid CSP violations
+  // when browser extensions (like MetaMask) inject Content-Security-Policy headers
+  // that block 'unsafe-eval'. This provides source maps without using eval().
+  // See: https://github.com/facebookincubator/create-react-app/issues/343#issuecomment-237241875
+  devtool: 'cheap-module-source-map',
   // These are the "entry points" to our application.
   // This means they will be the "root" imports that are included in JS bundle.
   // The first two entry points enable "hot" CSS and auto-refreshes for JS.
@@ -60,7 +61,7 @@ module.exports = {
     // We ship a few polyfills by default:
     require.resolve('./polyfills'),
     // Finally, this is your app's code:
-    paths.appIndexJs
+    paths.appIndexJs,
     // We include the app code last so that if there is a runtime error during
     // initialization, it doesn't blow up the WebpackDevServer client, and
     // changing JS code would still trigger a refresh.
@@ -75,7 +76,7 @@ module.exports = {
     // containing code from all our entry points, and the Webpack runtime.
     filename: 'static/js/bundle.js',
     // This is the URL that app is served from. We use "/" in development.
-    publicPath: publicPath
+    publicPath: publicPath,
   },
   resolve: {
     // This allows you to set a fallback for where Webpack should look for modules.
@@ -92,8 +93,8 @@ module.exports = {
     alias: {
       // Support React Native Web
       // https://www.smashingmagazine.com/2016/08/a-glimpse-into-the-future-with-react-native-for-web/
-      'react-native': 'react-native-web'
-    }
+      'react-native': 'react-native-web',
+    },
   },
 
   module: {
@@ -104,7 +105,7 @@ module.exports = {
         test: /\.(js|jsx)$/,
         loader: 'eslint',
         include: paths.appSrc,
-      }
+      },
     ],
     loaders: [
       // Process JS with Babel.
@@ -113,15 +114,14 @@ module.exports = {
         include: paths.appSrc,
         loader: 'babel',
         query: {
-
           // This is a feature of `babel-loader` for webpack (not Babel itself).
           // It enables caching results in ./node_modules/.cache/react-scripts/
           // directory for faster rebuilds. We use findCacheDir() because of:
           // https://github.com/facebookincubator/create-react-app/issues/483
           cacheDirectory: findCacheDir({
-            name: 'react-scripts'
-          })
-        }
+            name: 'react-scripts',
+          }),
+        },
       },
       // "postcss" loader applies autoprefixer to our CSS.
       // "css" loader resolves paths in CSS and adds assets as dependencies.
@@ -130,13 +130,13 @@ module.exports = {
       // in development "style" loader enables hot editing of CSS.
       {
         test: /\.css$/,
-        loader: 'style!css!postcss'
+        loader: 'style!css!postcss',
       },
       // JSON is not enabled by default in Webpack but both Node and Browserify
       // allow it implicitly so we also enable it.
       {
         test: /\.json$/,
-        loader: 'json'
+        loader: 'json',
       },
       // "file" loader makes sure those assets get served by WebpackDevServer.
       // When you `import` an asset, you get its (virtual) filename.
@@ -145,8 +145,8 @@ module.exports = {
         test: /\.(ico|jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2)(\?.*)?$/,
         loader: 'file',
         query: {
-          name: 'static/media/[name].[hash:8].[ext]'
-        }
+          name: 'static/media/[name].[hash:8].[ext]',
+        },
       },
       // "url" loader works just like "file" loader but it also embeds
       // assets smaller than specified size as data URLs to avoid requests.
@@ -155,14 +155,14 @@ module.exports = {
         loader: 'url',
         query: {
           limit: 10000,
-          name: 'static/media/[name].[hash:8].[ext]'
-        }
-      }
-    ]
+          name: 'static/media/[name].[hash:8].[ext]',
+        },
+      },
+    ],
   },
 
   // We use PostCSS for autoprefixing only.
-  postcss: function() {
+  postcss: function () {
     return [
       autoprefixer({
         browsers: [
@@ -170,7 +170,7 @@ module.exports = {
           'last 4 versions',
           'Firefox ESR',
           'not ie < 9', // React doesn't support IE8 anyway
-        ]
+        ],
       }),
     ];
   },
@@ -179,7 +179,7 @@ module.exports = {
     // <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico">
     // In development, this will be an empty string.
     new InterpolateHtmlPlugin({
-      PUBLIC_URL: publicUrl
+      PUBLIC_URL: publicUrl,
     }),
     // Generates an `index.html` file with the <script> injected.
     new HtmlWebpackPlugin({
@@ -200,13 +200,13 @@ module.exports = {
     // to restart the development server for Webpack to discover it. This plugin
     // makes the discovery automatic so you don't have to restart.
     // See https://github.com/facebookincubator/create-react-app/issues/186
-    new WatchMissingNodeModulesPlugin(paths.appNodeModules)
+    new WatchMissingNodeModulesPlugin(paths.appNodeModules),
   ],
   // Some libraries import Node modules but don't use them in the browser.
   // Tell Webpack to provide empty mocks for them so importing them works.
   node: {
     fs: 'empty',
     net: 'empty',
-    tls: 'empty'
-  }
+    tls: 'empty',
+  },
 };

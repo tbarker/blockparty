@@ -16,16 +16,16 @@ describe('arweaveMetadata', () => {
   describe('arweaveUriToGatewayUrl', () => {
     it('converts ar:// URI to gateway URL', () => {
       const result = arweaveUriToGatewayUrl('ar://abc123xyz');
-      expect(result).toBe('https://gateway.irys.xyz/abc123xyz');
+      expect(result).toBe('https://arweave.net/abc123xyz');
     });
 
     it('handles plain transaction ID', () => {
       const result = arweaveUriToGatewayUrl('abc123xyz');
-      expect(result).toBe('https://gateway.irys.xyz/abc123xyz');
+      expect(result).toBe('https://arweave.net/abc123xyz');
     });
 
     it('returns full https URL unchanged', () => {
-      const url = 'https://gateway.irys.xyz/abc123xyz';
+      const url = 'https://arweave.net/abc123xyz';
       const result = arweaveUriToGatewayUrl(url);
       expect(result).toBe(url);
     });
@@ -62,7 +62,7 @@ describe('arweaveMetadata', () => {
       expect(result.map_url).toBe('https://maps.google.com/?q=test');
       expect(result.location_text).toBe('123 Main St');
       expect(result.description_text).toBe('Test description');
-      expect(result.images.banner).toBe('https://gateway.irys.xyz/bannerTxId');
+      expect(result.images.banner).toBe('https://arweave.net/bannerTxId');
       expect(result.links.website).toBe('https://example.com');
     });
 
@@ -119,8 +119,8 @@ describe('arweaveMetadata', () => {
 
       const result = transformArweaveMetadata(arweaveMetadata);
 
-      expect(result.images.banner).toBe('https://gateway.irys.xyz/banner123');
-      expect(result.images.venue).toBe('https://gateway.irys.xyz/venue456');
+      expect(result.images.banner).toBe('https://arweave.net/banner123');
+      expect(result.images.venue).toBe('https://arweave.net/venue456');
       expect(result.images.logo).toBe('https://example.com/logo.png');
     });
   });

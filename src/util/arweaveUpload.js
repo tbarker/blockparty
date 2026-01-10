@@ -1,15 +1,15 @@
 /**
- * Browser-compatible Arweave upload module via Irys
+ * Browser-compatible Arweave upload module via ArDrive Turbo
  *
  * This module provides functionality to upload event metadata and images
- * to Arweave using Irys from a browser environment with MetaMask/wallet connection.
+ * to Arweave using ArDrive Turbo from a browser environment with MetaMask/wallet connection.
  *
  * Network behavior:
- * - Mainnet (chainId 1): Uses Irys mainnet (costs real ETH)
- * - Sepolia (chainId 11155111): Uses Irys devnet with Sepolia RPC
- * - Local/dev (chainId 1337): Uses Irys devnet with Sepolia RPC (skipped in E2E tests)
+ * - Mainnet (chainId 1): Uses ArDrive Turbo production services (costs real credits)
+ * - Sepolia (chainId 11155111): Uses ArDrive Turbo dev services
+ * - Local/dev (chainId 1337): Uses ArDrive Turbo dev services
  *
- * NOTE: The actual Irys upload functionality requires the @irys/web-upload packages
+ * NOTE: The actual Turbo upload functionality requires the @ardrive/turbo-sdk package
  * which may have bundling issues with webpack. If uploads fail, users can use the
  * command-line upload script (scripts/upload-metadata.js) as an alternative.
  *
@@ -22,42 +22,46 @@
  *   }
  */
 
-// Irys gateway for viewing uploads
-const IRYS_GATEWAY = 'https://gateway.irys.xyz';
+// Standard Arweave gateway for viewing uploads
+const ARWEAVE_GATEWAY = 'https://arweave.net';
 
-// Default Sepolia RPC URL (used for devnet mode)
-const DEFAULT_SEPOLIA_RPC = 'https://rpc.sepolia.org';
-
-// Get Sepolia RPC URL from environment or use default
-const getSepoliaRpcUrl = () => {
-  return process.env.SEPOLIA_RPC_URL || DEFAULT_SEPOLIA_RPC;
-};
+// ArDrive Turbo development service URLs (for devnet mode)
+const DEV_PAYMENT_SERVICE = 'https://payment.ardrive.dev';
+const DEV_UPLOAD_SERVICE = 'https://upload.ardrive.dev';
 
 /**
- * Determine if we should use Irys devnet based on network ID
+ * Determine if we should use devnet based on network ID
  * @param {string} networkId - The connected network's chain ID
  * @returns {boolean} Whether to use devnet
  */
 const shouldUseDevnet = networkId => {
   // Check localStorage first (explicit user setting takes precedence)
   if (typeof window !== 'undefined' && window.localStorage) {
-    const stored = window.localStorage.getItem('irys_devnet');
-    if (stored !== null) {
-      return stored === 'true';
+    const stored = window.localStorage.getItem('turbo_devnet');
+    // Check for actual string value (not null/undefined)
+    if (stored === 'true') {
+      return true;
     }
+    if (stored === 'false') {
+      return false;
+    }
+    // If stored is null/undefined, continue to network detection
   }
 
+  // Ensure networkId is a string for comparison
+  const netIdStr = String(networkId);
+
   // Network-based detection
-  switch (networkId) {
+  switch (netIdStr) {
     case '1':
-      // Ethereum mainnet - use Irys mainnet
+      // Ethereum mainnet - use production
       return false;
     case '11155111':
-      // Sepolia testnet - use Irys devnet
+      // Sepolia testnet - use devnet
       return true;
     case '1337':
     case '31337':
-      // Local development - use Irys devnet
+      // Local development - use devnet
       return true;
     default:
       // Unknown network - check if localhost
@@ -73,26 +77,14 @@ const shouldUseDevnet = networkId => {
 };
 
 /**
- * Check if we're in E2E test mode
- * @returns {boolean}
- */
-const isE2ETest = () => {
-  return typeof window !== 'undefined' && window.__E2E_CONFIG__ !== undefined;
-};
-
-/**
- * Check if Irys upload functionality is available
+ * Check if Turbo upload functionality is available
  * @param {string} _networkId - The connected network's chain ID (optional, reserved for future use)
  * @returns {Promise<boolean>}
  */
 export async function isUploadAvailable(_networkId) {
-  // Note: We check SDK availability even in E2E tests to catch webpack bundling issues.
-  // The actual upload operations are blocked in E2E mode by getIrysUploader().
   try {
     // Try to load the SDK
-    await import('@irys/web-upload');
-    await import('@irys/web-upload-ethereum');
-    await import('@irys/web-upload-ethereum-ethers-v6');
+    await import('@ardrive/turbo-sdk/web');
     return true;
   } catch {
     return false;
@@ -100,25 +92,23 @@ export async function isUploadAvailable(_networkId) {
 }
 
 /**
- * Dynamically import Irys SDK
- * @returns {Promise<{WebUploader: Function, WebEthereum: Object, EthersV6Adapter: Function}>}
+ * Dynamically import ArDrive Turbo SDK and arbundles
+ * @returns {Promise<{TurboFactory: Object, InjectedEthereumSigner: Object}>}
  * @throws {Error} If SDK cannot be loaded
  */
-async function loadIrysSDK() {
+async function loadTurboSDK() {
   try {
-    const [webUploadModule, webEthereumModule, ethersV6Module] = await Promise.all([
-      import('@irys/web-upload'),
-      import('@irys/web-upload-ethereum'),
-      import('@irys/web-upload-ethereum-ethers-v6'),
+    const [turboModule, arbundlesModule] = await Promise.all([
+      import('@ardrive/turbo-sdk/web'),
+      import('@dha-team/arbundles'),
     ]);
 
     return {
-      WebUploader: webUploadModule.WebUploader,
-      WebEthereum: webEthereumModule.WebEthereum,
-      EthersV6Adapter: ethersV6Module.EthersV6Adapter,
+      TurboFactory: turboModule.TurboFactory,
+      InjectedEthereumSigner: arbundlesModule.InjectedEthereumSigner,
     };
   } catch (error) {
-    console.error('Failed to load Irys SDK:', error);
+    console.error('Failed to load ArDrive Turbo SDK:', error);
     throw new Error(
       'Arweave upload is not available in this browser session. ' +
         'Please use the command-line tool: npm run upload:metadata'
@@ -127,132 +117,229 @@ async function loadIrysSDK() {
 }
 
 /**
- * Initialize Irys uploader with browser wallet (MetaMask/ethers provider)
+ * Create a provider wrapper compatible with InjectedEthereumSigner
+ * Handles ethers v6 signer to work with arbundles which expects v5 patterns
+ * @param {Object} ethersSigner - ethers v6 signer from provider.getSigner()
+ * @param {string} address - wallet address
+ * @returns {Object} Provider wrapper for InjectedEthereumSigner
+ */
+function createProviderWrapper(ethersSigner, address) {
+  return {
+    getSigner: () => ({
+      signMessage: async message => {
+        console.log('[Arweave] signMessage called, message type:', typeof message);
+
+        // Convert Uint8Array to hex string for personal_sign
+        // InjectedEthereumSigner may pass string or Uint8Array
+        let messageToSign;
+        if (typeof message === 'string') {
+          messageToSign = message;
+        } else {
+          // Convert Uint8Array to hex string prefixed with 0x
+          messageToSign =
+            '0x' +
+            Array.from(message)
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('');
+        }
+
+        console.log('[Arweave] Requesting signature via personal_sign...');
+
+        // Use direct ethereum RPC for compatibility
+        const signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [messageToSign, address],
+        });
+
+        console.log('[Arweave] Signature received');
+        return signature;
+      },
+    }),
+  };
+}
+
+/**
+ * Initialize Turbo uploader with browser wallet (MetaMask/ethers provider)
  * @param {Object} provider - ethers.js v6 BrowserProvider
  * @param {string} networkId - The connected network's chain ID
- * @returns {Object} Irys uploader instance
+ * @returns {Object} Turbo uploader instance
  */
-export async function getIrysUploader(provider, networkId) {
-  // Skip uploads during E2E tests
-  if (isE2ETest()) {
-    throw new Error('Arweave uploads are disabled during E2E tests');
+export async function getTurboUploader(provider, networkId) {
+  console.log('[Arweave] Loading SDK...');
+  const { TurboFactory, InjectedEthereumSigner } = await loadTurboSDK();
+  console.log('[Arweave] SDK loaded successfully');
+
+  console.log('[Arweave] Initializing Turbo uploader...');
+
+  // Get wallet address from ethers provider
+  const ethersSigner = await provider.getSigner();
+  const address = await ethersSigner.getAddress();
+  console.log(`[Arweave] Using wallet address: ${address}`);
+
+  // Create provider wrapper that works with InjectedEthereumSigner
+  console.log('[Arweave] Creating provider wrapper...');
+  const providerWrapper = createProviderWrapper(ethersSigner, address);
+  console.log('[Arweave] Provider wrapper created');
+
+  // Create signer using the documented pattern from ArDrive docs
+  console.log('[Arweave] Creating InjectedEthereumSigner...');
+  let signer;
+  try {
+    signer = new InjectedEthereumSigner(providerWrapper);
+    console.log('[Arweave] InjectedEthereumSigner created');
+  } catch (signerError) {
+    console.error('[Arweave] Failed to create InjectedEthereumSigner:', signerError);
+    throw signerError;
   }
 
-  const { WebUploader, WebEthereum, EthersV6Adapter } = await loadIrysSDK();
+  // Configure devnet/mainnet mode based on network
+  const useDevnet = shouldUseDevnet(networkId);
 
-  // Use EthersV6Adapter for ethers v6 compatibility
-  let builder = WebUploader(WebEthereum).withAdapter(EthersV6Adapter(provider));
+  const options = {
+    signer,
+    token: 'ethereum',
+  };
 
-  // Configure devnet mode based on network
-  if (shouldUseDevnet(networkId)) {
-    const sepoliaRpc = getSepoliaRpcUrl();
-    console.log(`Using Irys devnet with Sepolia RPC: ${sepoliaRpc}`);
-    builder = builder.withRpc(sepoliaRpc).devnet();
+  if (useDevnet) {
+    options.paymentServiceConfig = { url: DEV_PAYMENT_SERVICE };
+    options.uploadServiceConfig = { url: DEV_UPLOAD_SERVICE };
+    console.log(
+      `[Arweave] Using ArDrive Turbo devnet (payment: ${DEV_PAYMENT_SERVICE}, upload: ${DEV_UPLOAD_SERVICE})`
+    );
+  } else {
+    console.log('[Arweave] Using ArDrive Turbo production');
   }
 
-  const irys = await builder;
-  return irys;
+  console.log('[Arweave] Creating authenticated Turbo client...');
+  let turbo;
+  try {
+    turbo = TurboFactory.authenticated(options);
+    console.log('[Arweave] Turbo client created successfully');
+  } catch (turboError) {
+    console.error('[Arweave] Failed to create Turbo client:', turboError);
+    throw turboError;
+  }
+
+  return turbo;
 }
+
 
 /**
  * Get the estimated cost for uploading data
- * @param {Object} irys - Irys uploader instance
+ * @param {Object} turbo - Turbo uploader instance
  * @param {number} bytes - Size of data in bytes
- * @returns {Object} Cost in atomic units and formatted ETH string
+ * @returns {Object} Cost in credits
  */
-export async function getPrice(irys, bytes) {
-  const price = await irys.getPrice(bytes);
-  const priceInEth = irys.utils.fromAtomic(price);
+export async function getPrice(turbo, bytes) {
+  const [costInfo] = await turbo.getUploadCosts({ bytes: [bytes] });
+  const { winc } = costInfo;
+
+  // winc = winston credits (smallest Turbo credit unit)
+  // 1 credit = 1,000,000,000,000 winc (10^12)
+  const credits = Number(winc) / 1e12;
+
   return {
-    atomic: price,
-    eth: priceInEth,
-    formatted: `${parseFloat(priceInEth).toFixed(6)} ETH`,
+    atomic: BigInt(winc),
+    winc: winc,
+    credits: credits,
+    formatted: credits < 0.001 ? `${winc} winc` : `${credits.toFixed(6)} credits`,
   };
 }
 
 /**
- * Check if the wallet has sufficient balance for upload
- * @param {Object} irys - Irys uploader instance
- * @param {number} requiredBytes - Size of data to upload
- * @returns {Object} Balance info and whether it's sufficient
- */
-export async function checkBalance(irys, requiredBytes) {
-  const balance = await irys.getBalance();
-  const price = await irys.getPrice(requiredBytes);
-  const balanceInEth = irys.utils.fromAtomic(balance);
-  const priceInEth = irys.utils.fromAtomic(price);
-
-  return {
-    balance: balance,
-    balanceEth: balanceInEth,
-    required: price,
-    requiredEth: priceInEth,
-    sufficient: balance >= price,
-    shortfall: balance < price ? price - balance : 0n,
-  };
-}
-
-/**
- * Fund the Irys node with ETH
- * @param {Object} irys - Irys uploader instance
- * @param {BigInt|string} amount - Amount in atomic units or ETH string
- * @returns {Object} Funding transaction receipt
- */
-export async function fundNode(irys, amount) {
-  const receipt = await irys.fund(amount);
-  return receipt;
-}
-
-/**
- * Upload a file (image) to Arweave via Irys
- * @param {Object} irys - Irys uploader instance
+ * Upload a file (image) to Arweave via ArDrive Turbo
+ * @param {Object} turbo - Turbo uploader instance
  * @param {File} file - File object to upload
  * @param {Function} onProgress - Optional progress callback
  * @returns {string} Arweave URI (ar://txId)
  */
-export async function uploadFile(irys, file, onProgress) {
+export async function uploadFile(turbo, file, onProgress) {
   const tags = [
     { name: 'Content-Type', value: file.type || 'application/octet-stream' },
     { name: 'application-id', value: 'blockparty' },
     { name: 'filename', value: file.name },
   ];
 
-  // Read file as ArrayBuffer
-  const buffer = await file.arrayBuffer();
-  const data = new Uint8Array(buffer);
+  console.log(`[Arweave Upload] Starting file upload: ${file.name} (${file.size} bytes, type: ${file.type})`);
 
-  // Upload with progress if available
-  const receipt = await irys.upload(data, { tags });
+  try {
+    // Use file's native stream for better browser compatibility
+    const result = await turbo.uploadFile({
+      fileStreamFactory: () => file.stream(),
+      fileSizeFactory: () => file.size,
+      dataItemOpts: { tags },
+    });
 
-  if (onProgress) {
-    onProgress({ type: 'file', name: file.name, uri: `ar://${receipt.id}` });
+    const uri = `ar://${result.id}`;
+    console.log(`[Arweave Upload] File upload successful: ${uri}`);
+
+    if (onProgress) {
+      onProgress({ type: 'file', name: file.name, uri });
+    }
+
+    return uri;
+  } catch (error) {
+    console.error(`[Arweave Upload] File upload failed for ${file.name}:`, error);
+    console.error('[Arweave Upload] Error details:', {
+      name: error.name,
+      message: error.message,
+      response: error.response,
+      status: error.status,
+    });
+    throw error;
   }
-
-  return `ar://${receipt.id}`;
 }
 
 /**
- * Upload JSON metadata to Arweave via Irys
- * @param {Object} irys - Irys uploader instance
+ * Upload JSON metadata to Arweave via ArDrive Turbo
+ * @param {Object} turbo - Turbo uploader instance
  * @param {Object} metadata - Metadata object to upload
  * @param {Function} onProgress - Optional progress callback
  * @returns {string} Arweave URI (ar://txId)
  */
-export async function uploadMetadataJson(irys, metadata, onProgress) {
+export async function uploadMetadataJson(turbo, metadata, onProgress) {
   const tags = [
     { name: 'Content-Type', value: 'application/json' },
     { name: 'application-id', value: 'blockparty' },
   ];
 
-  const data = JSON.stringify(metadata, null, 2);
+  const dataString = JSON.stringify(metadata, null, 2);
+  const dataBuffer = new TextEncoder().encode(dataString);
 
-  const receipt = await irys.upload(data, { tags });
+  console.log(`[Arweave Upload] Starting metadata upload, size: ${dataBuffer.length} bytes`);
 
-  if (onProgress) {
-    onProgress({ type: 'metadata', uri: `ar://${receipt.id}` });
+  try {
+    // Use uploadFile with stream factory (same pattern as CLI script)
+    const result = await turbo.uploadFile({
+      fileStreamFactory: () =>
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(dataBuffer);
+            controller.close();
+          },
+        }),
+      fileSizeFactory: () => dataBuffer.length,
+      dataItemOpts: { tags },
+    });
+
+    const uri = `ar://${result.id}`;
+    console.log(`[Arweave Upload] Metadata upload successful: ${uri}`);
+
+    if (onProgress) {
+      onProgress({ type: 'metadata', uri });
+    }
+
+    return uri;
+  } catch (error) {
+    console.error('[Arweave Upload] Metadata upload failed:', error);
+    console.error('[Arweave Upload] Error details:', {
+      name: error.name,
+      message: error.message,
+      response: error.response,
+      status: error.status,
+    });
+    throw error;
   }
-
-  return `ar://${receipt.id}`;
 }
 
 /**
@@ -287,9 +374,9 @@ export function calculateTotalSize(metadata, imageFiles = {}) {
  * @returns {Object} Cost estimation
  */
 export async function getUploadCost(provider, networkId, metadata, imageFiles = {}) {
-  const irys = await getIrysUploader(provider, networkId);
+  const turbo = await getTurboUploader(provider, networkId);
   const totalSize = calculateTotalSize(metadata, imageFiles);
-  const price = await getPrice(irys, totalSize);
+  const price = await getPrice(turbo, totalSize);
 
   return {
     size: totalSize,
@@ -314,7 +401,10 @@ export async function uploadEventMetadata(
   imageFiles = {},
   onProgress
 ) {
-  const irys = await getIrysUploader(provider, networkId);
+  console.log('[Arweave] uploadEventMetadata called with', Object.keys(imageFiles).length, 'image files');
+
+  const turbo = await getTurboUploader(provider, networkId);
+  console.log('[Arweave] Got Turbo uploader, starting uploads...');
 
   // Clone metadata to avoid mutating the original
   const updatedMetadata = JSON.parse(JSON.stringify(metadata));
@@ -328,11 +418,13 @@ export async function uploadEventMetadata(
   const imageCount = Object.keys(imageFiles).filter(k => imageFiles[k] instanceof File).length;
   const totalSteps = imageCount + 1; // images + metadata
   let currentStep = 0;
+  console.log(`[Arweave] Total upload steps: ${totalSteps} (${imageCount} images + 1 metadata)`);
 
   // Upload each image file
   for (const [key, file] of Object.entries(imageFiles)) {
     if (file instanceof File) {
       currentStep++;
+      console.log(`[Arweave] Step ${currentStep}/${totalSteps}: Uploading image "${key}" (${file.name}, ${file.size} bytes)`);
       if (onProgress) {
         onProgress({
           step: currentStep,
@@ -341,13 +433,20 @@ export async function uploadEventMetadata(
         });
       }
 
-      const uri = await uploadFile(irys, file);
-      updatedMetadata.images[key] = uri;
+      try {
+        const uri = await uploadFile(turbo, file);
+        console.log(`[Arweave] Image upload success: ${uri}`);
+        updatedMetadata.images[key] = uri;
+      } catch (uploadError) {
+        console.error(`[Arweave] Image upload failed:`, uploadError);
+        throw uploadError;
+      }
     }
   }
 
   // Upload metadata JSON
   currentStep++;
+  console.log(`[Arweave] Step ${currentStep}/${totalSteps}: Uploading metadata JSON`);
   if (onProgress) {
     onProgress({
       step: currentStep,
@@ -356,18 +455,24 @@ export async function uploadEventMetadata(
     });
   }
 
-  const metadataUri = await uploadMetadataJson(irys, updatedMetadata);
+  try {
+    const metadataUri = await uploadMetadataJson(turbo, updatedMetadata);
+    console.log(`[Arweave] Metadata upload success: ${metadataUri}`);
 
-  if (onProgress) {
-    onProgress({
-      step: totalSteps,
-      total: totalSteps,
-      message: 'Upload complete!',
-      uri: metadataUri,
-    });
+    if (onProgress) {
+      onProgress({
+        step: totalSteps,
+        total: totalSteps,
+        message: 'Upload complete!',
+        uri: metadataUri,
+      });
+    }
+
+    return metadataUri;
+  } catch (metadataError) {
+    console.error(`[Arweave] Metadata upload failed:`, metadataError);
+    throw metadataError;
   }
-
-  return metadataUri;
 }
 
 /**
@@ -383,7 +488,7 @@ export function arweaveUriToGatewayUrl(arweaveUri) {
   }
 
   const txId = arweaveUri.replace('ar://', '');
-  return `${IRYS_GATEWAY}/${txId}`;
+  return `${ARWEAVE_GATEWAY}/${txId}`;
 }
 
 /**
@@ -404,19 +509,63 @@ function formatBytes(bytes) {
 export function setDevnetMode(enabled) {
   if (typeof window !== 'undefined' && window.localStorage) {
     if (enabled) {
-      window.localStorage.setItem('irys_devnet', 'true');
+      window.localStorage.setItem('turbo_devnet', 'true');
     } else {
-      window.localStorage.removeItem('irys_devnet');
+      window.localStorage.removeItem('turbo_devnet');
     }
   }
 }
 
+/**
+ * Wait for Arweave data to be available on gateway
+ * @param {string} metadataUri - The ar:// URI to check
+ * @param {Object} options - Options object
+ * @param {number} options.maxAttempts - Maximum number of attempts (default: 30)
+ * @param {number} options.intervalMs - Interval between attempts in ms (default: 2000)
+ * @param {Function} options.onProgress - Progress callback
+ * @param {string} options.networkId - Network ID to determine if devnet (optional)
+ * @returns {Promise<boolean>} True if data is available, false if timed out
+ */
+export async function waitForArweaveConfirmation(metadataUri, options = {}) {
+  const { maxAttempts = 30, intervalMs = 2000, onProgress, networkId } = options;
+
+  if (!metadataUri) return true;
+
+  // In devnet mode, skip gateway confirmation since devnet uploads
+  // won't appear on the public arweave.net gateway
+  if (networkId && shouldUseDevnet(networkId)) {
+    console.log('[Arweave] Skipping gateway confirmation (devnet mode)');
+    return true;
+  }
+
+  const gatewayUrl = arweaveUriToGatewayUrl(metadataUri);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(gatewayUrl, { method: 'HEAD' });
+      if (response.ok) {
+        return true;
+      }
+    } catch {
+      // Network error, continue trying
+    }
+
+    if (onProgress) {
+      onProgress({ attempt, maxAttempts, uri: metadataUri });
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  return false;
+}
+
 export default {
   isUploadAvailable,
-  getIrysUploader,
+  getTurboUploader,
   getPrice,
-  checkBalance,
-  fundNode,
   uploadFile,
   uploadMetadataJson,
   calculateTotalSize,
@@ -425,4 +574,5 @@ export default {
   arweaveUriToGatewayUrl,
   setDevnetMode,
   shouldUseDevnet,
+  waitForArweaveConfirmation,
 };

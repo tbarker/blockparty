@@ -1,28 +1,31 @@
 #!/usr/bin/env node
 
 /**
- * Upload event metadata and media to Arweave via Irys
+ * Upload event metadata and media to Arweave via ArDrive Turbo
  *
  * Usage:
  *   node scripts/upload-metadata.js <metadata.json> [options]
  *
  * Options:
- *   --devnet     Use Irys devnet (Sepolia testnet, free but expires after ~60 days)
+ *   --devnet     Use ArDrive Turbo dev services (for testing)
  *   --dry-run    Show upload cost estimate without uploading
  *
  * Environment:
  *   ARWEAVE_PRIVATE_KEY   Ethereum private key for payment (preferred)
  *   ARWEAVE_SEED_PHRASE   Seed phrase (12/24 words) - alternative to private key
  *   PRIVATE_KEY           Legacy: Ethereum private key for payment
- *   RPC_URL               RPC endpoint (required for devnet)
  *
  * Example:
  *   ARWEAVE_PRIVATE_KEY=0x... node scripts/upload-metadata.js ./metadata/event/metadata.json
- *   ARWEAVE_SEED_PHRASE="word1 word2 ..." RPC_URL=https://rpc.sepolia.org node scripts/upload-metadata.js ./metadata/event/metadata.json --devnet
+ *   ARWEAVE_SEED_PHRASE="word1 word2 ..." node scripts/upload-metadata.js ./metadata/event/metadata.json --devnet
  */
 
 const fs = require('fs').promises;
 const path = require('path');
+
+// ArDrive Turbo development service URLs (for devnet mode)
+const DEV_PAYMENT_SERVICE = 'https://payment.ardrive.dev';
+const DEV_UPLOAD_SERVICE = 'https://upload.ardrive.dev';
 
 // MIME type mapping for common file extensions
 const MIME_TYPES = {
@@ -51,6 +54,12 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatCredits(winc) {
+  // 1 credit = 1,000,000,000,000 winc (10^12)
+  const credits = Number(winc) / 1e12;
+  return credits < 0.001 ? `${winc} winc` : `${credits.toFixed(6)} credits`;
+}
+
 /**
  * Get private key from environment variables
  * Supports: ARWEAVE_PRIVATE_KEY, ARWEAVE_SEED_PHRASE, or legacy PRIVATE_KEY
@@ -77,10 +86,9 @@ async function getPrivateKey() {
   return null;
 }
 
-async function getIrysUploader(isDevnet) {
+async function getTurboUploader(isDevnet) {
   // Dynamic import for ESM modules from CommonJS
-  const { Uploader } = await import('@irys/upload');
-  const { Ethereum } = await import('@irys/upload-ethereum');
+  const { TurboFactory, EthereumSigner } = await import('@ardrive/turbo-sdk');
 
   const privateKey = await getPrivateKey();
   if (!privateKey) {
@@ -92,28 +100,29 @@ async function getIrysUploader(isDevnet) {
     );
   }
 
-  let uploaderBuilder = Uploader(Ethereum).withWallet(privateKey);
+  const signer = new EthereumSigner(privateKey);
+
+  const options = {
+    signer,
+    token: 'ethereum',
+  };
 
   if (isDevnet) {
-    const rpcUrl = process.env.RPC_URL;
-    if (!rpcUrl) {
-      throw new Error('RPC_URL environment variable is required for devnet');
-    }
-    uploaderBuilder = uploaderBuilder.withRpc(rpcUrl).devnet();
+    options.paymentServiceConfig = { url: DEV_PAYMENT_SERVICE };
+    options.uploadServiceConfig = { url: DEV_UPLOAD_SERVICE };
   }
 
-  return await uploaderBuilder;
+  return TurboFactory.authenticated(options);
 }
 
-async function uploadFile(irys, filePath, isDryRun) {
+async function uploadFile(turbo, filePath, isDryRun) {
   const stats = await fs.stat(filePath);
   const fileName = path.basename(filePath);
   const mimeType = getMimeType(filePath);
 
   if (isDryRun) {
-    const price = await irys.getPrice(stats.size);
-    const priceInEth = irys.utils.fromAtomic(price);
-    console.log(`  ${fileName} (${formatBytes(stats.size)}) - estimated cost: ${priceInEth} ETH`);
+    const [costInfo] = await turbo.getUploadCosts({ bytes: [stats.size] });
+    console.log(`  ${fileName} (${formatBytes(stats.size)}) - estimated cost: ${formatCredits(costInfo.winc)}`);
     return null;
   }
 
@@ -122,19 +131,25 @@ async function uploadFile(irys, filePath, isDryRun) {
     { name: 'application-id', value: 'blockparty' },
   ];
 
-  const receipt = await irys.uploadFile(filePath, { tags });
-  console.log(`  ${fileName} (${formatBytes(stats.size)}) => ar://${receipt.id}`);
-  return `ar://${receipt.id}`;
+  const fileData = await fs.readFile(filePath);
+  const result = await turbo.uploadFile({
+    fileStreamFactory: () => fileData,
+    fileSizeFactory: () => fileData.length,
+    dataItemOpts: { tags },
+  });
+
+  console.log(`  ${fileName} (${formatBytes(stats.size)}) => ar://${result.id}`);
+  return `ar://${result.id}`;
 }
 
-async function uploadData(irys, data, contentType, isDryRun) {
+async function uploadData(turbo, data, contentType, isDryRun) {
   const dataString = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  const size = Buffer.byteLength(dataString, 'utf8');
+  const dataBuffer = Buffer.from(dataString, 'utf8');
+  const size = dataBuffer.length;
 
   if (isDryRun) {
-    const price = await irys.getPrice(size);
-    const priceInEth = irys.utils.fromAtomic(price);
-    console.log(`  metadata.json (${formatBytes(size)}) - estimated cost: ${priceInEth} ETH`);
+    const [costInfo] = await turbo.getUploadCosts({ bytes: [size] });
+    console.log(`  metadata.json (${formatBytes(size)}) - estimated cost: ${formatCredits(costInfo.winc)}`);
     return null;
   }
 
@@ -143,12 +158,17 @@ async function uploadData(irys, data, contentType, isDryRun) {
     { name: 'application-id', value: 'blockparty' },
   ];
 
-  const receipt = await irys.upload(dataString, { tags });
-  console.log(`  metadata.json (${formatBytes(size)}) => ar://${receipt.id}`);
-  return `ar://${receipt.id}`;
+  const result = await turbo.uploadFile({
+    fileStreamFactory: () => dataBuffer,
+    fileSizeFactory: () => size,
+    dataItemOpts: { tags },
+  });
+
+  console.log(`  metadata.json (${formatBytes(size)}) => ar://${result.id}`);
+  return `ar://${result.id}`;
 }
 
-async function processImages(irys, images, baseDir, isDryRun) {
+async function processImages(turbo, images, baseDir, isDryRun) {
   const uploadedImages = {};
 
   for (const [key, filePath] of Object.entries(images)) {
@@ -174,7 +194,7 @@ async function processImages(irys, images, baseDir, isDryRun) {
       continue;
     }
 
-    const arUri = await uploadFile(irys, fullPath, isDryRun);
+    const arUri = await uploadFile(turbo, fullPath, isDryRun);
     uploadedImages[key] = arUri || filePath;
   }
 
@@ -193,20 +213,19 @@ async function main() {
     console.error('Usage: node scripts/upload-metadata.js <metadata.json> [--devnet] [--dry-run]');
     console.error('');
     console.error('Options:');
-    console.error('  --devnet   Use Irys devnet (Sepolia, free but expires after ~60 days)');
+    console.error('  --devnet   Use ArDrive Turbo dev services (for testing)');
     console.error('  --dry-run  Show cost estimate without uploading');
     console.error('');
     console.error('Environment:');
     console.error('  ARWEAVE_PRIVATE_KEY   Ethereum private key for payment (preferred)');
     console.error('  ARWEAVE_SEED_PHRASE   Seed phrase (12/24 words) - alternative to private key');
     console.error('  PRIVATE_KEY           Legacy: Ethereum private key');
-    console.error('  RPC_URL               RPC endpoint (required for devnet)');
     process.exit(1);
   }
 
   console.log('');
-  console.log('BlockParty Metadata Uploader');
-  console.log('============================');
+  console.log('BlockParty Metadata Uploader (ArDrive Turbo)');
+  console.log('============================================');
   console.log('');
 
   // Read metadata file
@@ -221,35 +240,34 @@ async function main() {
 
   const baseDir = path.dirname(path.resolve(metadataPath));
 
-  // Initialize Irys
-  console.log(`Network: ${isDevnet ? 'devnet (Sepolia)' : 'mainnet'}`);
+  // Initialize Turbo
+  console.log(`Network: ${isDevnet ? 'devnet (ArDrive dev services)' : 'production'}`);
   if (isDryRun) {
     console.log('Mode: DRY RUN (no uploads will be made)');
   }
   console.log('');
 
-  let irys;
+  let turbo;
   try {
-    irys = await getIrysUploader(isDevnet);
-    console.log(`Wallet: ${irys.address}`);
-    const balance = await irys.getBalance();
-    console.log(`Balance: ${irys.utils.fromAtomic(balance)} ETH`);
+    turbo = await getTurboUploader(isDevnet);
+    const balance = await turbo.getBalance();
+    console.log(`Balance: ${formatCredits(balance.winc)}`);
     console.log('');
   } catch (error) {
-    console.error(`Error initializing Irys: ${error.message}`);
+    console.error(`Error initializing ArDrive Turbo: ${error.message}`);
     process.exit(1);
   }
 
   // Upload media files
   if (metadata.images && Object.keys(metadata.images).length > 0) {
     console.log('Uploading media files...');
-    metadata.images = await processImages(irys, metadata.images, baseDir, isDryRun);
+    metadata.images = await processImages(turbo, metadata.images, baseDir, isDryRun);
     console.log('');
   }
 
   // Upload metadata JSON
   console.log('Uploading metadata...');
-  const metadataUri = await uploadData(irys, metadata, 'application/json', isDryRun);
+  const metadataUri = await uploadData(turbo, metadata, 'application/json', isDryRun);
   console.log('');
 
   if (isDryRun) {
@@ -260,7 +278,7 @@ async function main() {
     console.log('Upload complete!');
     console.log('');
     console.log(`Metadata URI: ${metadataUri}`);
-    console.log(`Gateway URL: https://gateway.irys.xyz/${txId}`);
+    console.log(`Gateway URL: https://arweave.net/${txId}`);
     console.log('');
     console.log('Deploy with:');
     console.log(

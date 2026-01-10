@@ -36,13 +36,13 @@ The `GroupAdmin` contract provides a two-tier system:
 
 The `isAdmin()` function returns true for both owner AND explicitly granted admins.
 
-### Arweave/Irys Integration
+### Arweave/ArDrive Turbo Integration
 
 **Upload mechanism (`scripts/upload-metadata.js`):**
 
-- Uses `@irys/upload` and `@irys/upload-ethereum` packages
+- Uses `@ardrive/turbo-sdk` package
 - Requires private key for signing uploads
-- Supports mainnet (permanent, costs ETH) and devnet (free, expires ~60 days)
+- Supports mainnet (permanent, costs Turbo credits) and devnet (ArDrive dev services)
 - Uploads images first, replaces local paths with `ar://` URIs in metadata JSON
 
 **Fetching (`src/util/arweaveMetadata.js`):**
@@ -177,80 +177,68 @@ function test_NonAdminCannotSetMetadataUri() public {
 The current upload script runs in Node.js. We need a browser-compatible version.
 
 ```javascript
-import { WebUploader } from '@irys/web-upload';
-import { WebEthereum } from '@irys/web-upload-ethereum';
-
-const IRYS_NETWORK = 'mainnet'; // or 'devnet' for testing
+import { TurboFactory } from '@ardrive/turbo-sdk/web';
 
 /**
- * Initialize Irys uploader with browser wallet (MetaMask)
+ * Initialize Turbo uploader with browser wallet (MetaMask)
  */
-export async function getIrysUploader(provider) {
-  const irys = await WebUploader(WebEthereum).withProvider(provider);
-  return irys;
+export async function getTurboUploader(provider, networkId) {
+  const signer = await provider.getSigner();
+  const options = { signer, token: 'ethereum' };
+
+  // Use devnet for testing (Sepolia/local networks)
+  if (networkId === '11155111' || networkId === '1337') {
+    options.paymentServiceConfig = { url: 'https://payment.ardrive.dev' };
+    options.uploadServiceConfig = { url: 'https://upload.ardrive.dev' };
+  }
+
+  return TurboFactory.authenticated(options);
 }
 
 /**
  * Check upload cost for given data size
  */
-export async function getUploadCost(irys, bytes) {
-  const price = await irys.getPrice(bytes);
-  return price;
+export async function getUploadCost(turbo, bytes) {
+  const [costInfo] = await turbo.getUploadCosts({ bytes: [bytes] });
+  return costInfo;
 }
 
 /**
- * Fund the Irys node if needed
+ * Upload a file to Arweave via Turbo
  */
-export async function fundNode(irys, amount) {
-  await irys.fund(amount);
-}
-
-/**
- * Upload a file to Arweave via Irys
- */
-export async function uploadFile(irys, file) {
+export async function uploadFile(turbo, file) {
   const tags = [
     { name: 'Content-Type', value: file.type },
     { name: 'application-id', value: 'blockparty' },
   ];
 
   const buffer = await file.arrayBuffer();
-  const receipt = await irys.upload(Buffer.from(buffer), { tags });
-  return `ar://${receipt.id}`;
-}
-
-/**
- * Upload JSON metadata to Arweave via Irys
- */
-export async function uploadMetadata(irys, metadata) {
-  const tags = [
-    { name: 'Content-Type', value: 'application/json' },
-    { name: 'application-id', value: 'blockparty' },
-  ];
-
-  const data = JSON.stringify(metadata, null, 2);
-  const receipt = await irys.upload(data, { tags });
-  return `ar://${receipt.id}`;
+  const result = await turbo.uploadFile({
+    fileStreamFactory: () => new Uint8Array(buffer),
+    fileSizeFactory: () => buffer.byteLength,
+    dataItemOpts: { tags },
+  });
+  return `ar://${result.id}`;
 }
 
 /**
  * Full upload flow: images first, then metadata with ar:// URIs
  */
-export async function uploadEventMetadata(irys, metadata, imageFiles) {
+export async function uploadEventMetadata(turbo, metadata, imageFiles) {
   const updatedMetadata = { ...metadata };
 
   // Upload images and replace paths with ar:// URIs
   if (imageFiles && updatedMetadata.images) {
     for (const [key, file] of Object.entries(imageFiles)) {
       if (file instanceof File) {
-        const uri = await uploadFile(irys, file);
+        const uri = await uploadFile(turbo, file);
         updatedMetadata.images[key] = uri;
       }
     }
   }
 
   // Upload metadata JSON
-  const metadataUri = await uploadMetadata(irys, updatedMetadata);
+  const metadataUri = await uploadMetadataJson(turbo, updatedMetadata);
   return metadataUri;
 }
 ```
@@ -262,17 +250,14 @@ export async function uploadEventMetadata(irys, metadata, imageFiles) {
 ```json
 {
   "dependencies": {
-    "@irys/web-upload": "^0.0.15",
-    "@irys/web-upload-ethereum": "^0.0.16"
+    "@ardrive/turbo-sdk": "^1.30.0"
   }
 }
 ```
 
-Note: Check if these are the correct package names for browser usage. The current packages (`@irys/upload`, `@irys/upload-ethereum`) may work in browser with proper webpack config, or may need browser-specific versions.
-
 #### 2.3 Webpack Configuration
 
-May need to add polyfills for Node.js modules used by Irys:
+May need to add polyfills for Node.js modules used by Turbo SDK:
 
 ```javascript
 // webpack.config.js
@@ -700,10 +685,10 @@ test.describe('Metadata Update E2E', () => {
     await page.fill('input[label="Event Name"]', 'Updated Event Name');
     await page.fill('textarea[label="Description"]', 'Updated description');
 
-    // Submit (will require MetaMask approval for Irys funding + contract tx)
+    // Submit (will require MetaMask approval for Turbo credits + contract tx)
     await page.click('button:has-text("Upload & Update")');
 
-    // Approve Irys funding transaction
+    // Approve Turbo credits transaction
     await metamask.confirmTransaction();
 
     // Approve contract update transaction
@@ -722,7 +707,7 @@ For unit and integration tests, create a mock Arweave service:
 **New file:** `src/__tests__/mocks/arweave.js`
 
 ```javascript
-export const mockIrysUploader = {
+export const mockTurboUploader = {
   getPrice: jest.fn().mockResolvedValue(BigInt(1000000)),
   fund: jest.fn().mockResolvedValue({ id: 'mock-fund-tx' }),
   upload: jest.fn().mockImplementation(data => ({
@@ -730,7 +715,7 @@ export const mockIrysUploader = {
   })),
 };
 
-export const getIrysUploader = jest.fn().mockResolvedValue(mockIrysUploader);
+export const getTurboUploader = jest.fn().mockResolvedValue(mockTurboUploader);
 ```
 
 ---
@@ -750,13 +735,13 @@ METADATA_URI=ar://testTxId npm run deploy:local
 npm start
 ```
 
-#### 5.2 Irys Devnet Testing
+#### 5.2 Turbo Devnet Testing
 
-The Irys devnet is free and uploads expire after ~60 days. Perfect for testing.
+ArDrive Turbo has dev services for testing. Perfect for development.
 
 ```bash
 # Set environment for devnet
-export IRYS_NETWORK=devnet
+export TURBO_DEVNET=true
 export RPC_URL=http://127.0.0.1:8545
 
 # In the UI, uploads will go to devnet
@@ -798,7 +783,7 @@ integration-metadata:
 
 ### Step 3: Browser Upload Module (2-3 hours)
 
-1. Research browser-compatible Irys packages
+1. Research browser-compatible Turbo SDK patterns
 2. Create `src/util/arweaveUpload.js`
 3. Update webpack config if needed
 4. Test upload functionality manually
@@ -820,7 +805,7 @@ integration-metadata:
 
 1. Update README with new feature
 2. Document admin capabilities
-3. Add troubleshooting for Irys funding
+3. Add troubleshooting for Turbo credits
 
 ---
 
@@ -835,7 +820,7 @@ integration-metadata:
    - Not practical due to gas costs
    - Validate in UI before upload
 
-3. **How to handle Irys funding in UI?**
+3. **How to handle Turbo credits in UI?**
    - Check balance, prompt user to fund if needed
    - Show estimated cost before upload
    - Consider subsidizing small uploads
@@ -857,8 +842,8 @@ integration-metadata:
 | Risk                                          | Impact | Mitigation                                              |
 | --------------------------------------------- | ------ | ------------------------------------------------------- |
 | Malicious admin uploads inappropriate content | Medium | Owner can revoke admin, content is on permanent Arweave |
-| Irys service unavailable                      | Low    | Show clear error, allow retry                           |
-| User doesn't have ETH for Irys funding        | Medium | Show cost upfront, provide devnet option for testing    |
+| Turbo service unavailable                     | Low    | Show clear error, allow retry                           |
+| User doesn't have credits for Turbo upload    | Medium | Show cost upfront, provide devnet option for testing    |
 | MetaMask rejects transaction                  | Low    | Clear error messages, retry option                      |
 | Arweave gateway slow/unavailable              | Low    | Use multiple gateways, show loading state               |
 

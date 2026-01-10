@@ -44,6 +44,8 @@ export default [
         assert: 'readonly',
         // Node.js
         Buffer: 'readonly',
+        // Webpack DefinePlugin constants
+        __WEBPACK_DEV_SERVER__: 'readonly',
       },
     },
     rules: {

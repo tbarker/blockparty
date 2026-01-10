@@ -15,7 +15,7 @@ jest.mock('../../util/arweaveMetadata', () => ({
   arweaveUriToGatewayUrl: jest.fn(uri => {
     if (!uri) return null;
     if (uri.startsWith('https://')) return uri;
-    return `https://gateway.irys.xyz/${uri.replace('ar://', '')}`;
+    return `https://arweave.net/${uri.replace('ar://', '')}`;
   }),
 }));
 

@@ -21,7 +21,11 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { uploadEventMetadata, isUploadAvailable } from '../util/arweaveUpload';
+import {
+  uploadEventMetadata,
+  isUploadAvailable,
+  waitForArweaveConfirmation,
+} from '../util/arweaveUpload';
 
 // Cooling period options (in seconds)
 const COOLING_PERIODS = [
@@ -237,12 +241,40 @@ class NewEventDialog extends Component {
               this.setState({ creationStep: progress.message });
             }
           );
-        } catch (uploadError) {
-          // If upload fails, continue without metadata
-          console.warn('Metadata upload failed, continuing without:', uploadError);
-          this.setState({
-            creationStep: 'Metadata upload failed, creating event without metadata...',
+
+          // Wait for Arweave to confirm the upload is available at the gateway
+          // This prevents the "missing metadata" issue when navigating to the new event
+          // Note: In devnet mode, this check is skipped since devnet data isn't on arweave.net
+          this.setState({ creationStep: 'Waiting for Arweave to confirm upload...' });
+
+          const confirmed = await waitForArweaveConfirmation(metadataUri, {
+            maxAttempts: 30,
+            intervalMs: 2000,
+            networkId,
+            onProgress: progress => {
+              this.setState({ creationStep: `Waiting for confirmation (${progress.attempt}/${progress.maxAttempts})...` });
+            },
           });
+
+          if (!confirmed) {
+            // Arweave confirmation timed out - show error and let user retry
+            this.setState({
+              error:
+                'Arweave upload confirmation timed out. The data was uploaded but is not yet available. Please try again.',
+              creating: false,
+              creationStep: '',
+            });
+            return;
+          }
+        } catch (uploadError) {
+          // If upload fails, show error and let user retry or cancel
+          console.error('Metadata upload failed:', uploadError);
+          this.setState({
+            error: `Metadata upload failed: ${uploadError.message || 'Unknown error'}. Please try again.`,
+            creating: false,
+            creationStep: '',
+          });
+          return;
         }
       }
 

@@ -7,6 +7,8 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
+const WELCOME_SEEN_KEY = 'blockparty_welcome_seen';
+
 export default class Instruction extends React.Component {
   constructor(props) {
     super(props);
@@ -16,16 +18,47 @@ export default class Instruction extends React.Component {
   }
 
   componentDidMount() {
+    // Listen for manual instruction triggers (e.g., About button)
     this.props.eventEmitter.on('instruction', () => {
       this.handleOpen();
     });
+
+    // Show welcome modal on first visit only
+    if (!this.hasSeenWelcome()) {
+      // Wait for next paint frame to ensure the app has rendered
+      requestAnimationFrame(() => {
+        this.handleOpen();
+      });
+    }
+  }
+
+  hasSeenWelcome() {
+    try {
+      return localStorage.getItem(WELCOME_SEEN_KEY) === 'true';
+    } catch {
+      // localStorage may not be available (e.g., private browsing)
+      return false;
+    }
+  }
+
+  markWelcomeSeen() {
+    try {
+      localStorage.setItem(WELCOME_SEEN_KEY, 'true');
+    } catch {
+      // localStorage may not be available
+    }
   }
 
   handleOpen() {
     this.setState({ open: true });
   }
 
-  handleClose() {
+  handleClose(event, reason) {
+    // Only close via the OK button, not backdrop click or escape key
+    if (reason === 'backdropClick' || reason === 'escapeKeyDown') {
+      return;
+    }
+    this.markWelcomeSeen();
     this.setState({ open: false });
   }
 
@@ -37,6 +70,13 @@ export default class Instruction extends React.Component {
         maxWidth="lg"
         fullWidth
         scroll="paper"
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            },
+          },
+        }}
       >
         <DialogTitle>Welcome to BlockParty</DialogTitle>
         <DialogContent dividers>

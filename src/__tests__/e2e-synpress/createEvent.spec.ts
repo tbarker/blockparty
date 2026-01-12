@@ -17,11 +17,13 @@ import {
   expect,
   createMetaMask,
   waitForTransactionSuccess,
+  waitForMetaMaskAndConfirm,
   connectWalletIfNeeded,
   injectE2EConfigFactoryOnly,
   injectE2EConfig,
   setupMetaMaskNetwork,
   dismissWelcomeModal,
+  waitForAppLoad,
 } from './fixtures';
 
 test.describe('Create Event Flow', () => {
@@ -46,9 +48,8 @@ test.describe('Create Event Flow', () => {
     // Wait for app to render
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Verify "+ New Event" button is visible
+    // Verify "+ New Event" button is visible (replaces arbitrary 2000ms wait)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
   });
@@ -72,9 +73,8 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Click "+ New Event" button
+    // Click "+ New Event" button (wait for it instead of arbitrary timeout)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
     await newEventButton.click();
@@ -116,11 +116,25 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
-    await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(3000);
 
-    // Verify landing page shows "Create New Event" button
+    // Wait for React to render the app content before dismissing modal
+    // (networkidle may timeout if modal image causes ongoing network activity)
+    await appPage.waitForLoadState('domcontentloaded');
+    await appPage
+      .waitForFunction(
+        () => {
+          const appDiv = document.getElementById('app');
+          return appDiv && appDiv.innerHTML.length > 100;
+        },
+        { timeout: 30000 }
+      )
+      .catch(() => {});
+
+    // Modal appears via requestAnimationFrame after React renders
+    await appPage.waitForTimeout(500);
+    await dismissWelcomeModal(appPage);
+
+    // Verify landing page shows "Create New Event" button (wait for it instead of arbitrary timeout)
     const createButton = appPage.locator('button:has-text("Create New Event")');
     await expect(createButton).toBeVisible({ timeout: 15000 });
   });
@@ -144,9 +158,8 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Click "+ New Event" button in AppBar
+    // Click "+ New Event" button in AppBar (wait for it instead of arbitrary timeout)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
     await newEventButton.click();
@@ -174,11 +187,8 @@ test.describe('Create Event Flow', () => {
     await expect(createButton).toBeEnabled({ timeout: 5000 });
     await createButton.click();
 
-    // Wait for MetaMask transaction popup
-    await appPage.waitForTimeout(3000);
-
-    // Confirm transaction in MetaMask
-    await metamask.confirmTransaction();
+    // Confirm transaction in MetaMask (waits for popup automatically)
+    await waitForMetaMaskAndConfirm(metamask, context);
 
     // Wait for success state
     const successDialog = appPage.locator('h2:has-text("Event Created Successfully!")');
@@ -204,9 +214,8 @@ test.describe('Create Event Flow', () => {
     // Wait for navigation and event page to load
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(3000);
 
-    // Verify we're on the new event page
+    // Verify we're on the new event page (wait for URL instead of arbitrary timeout)
     await expect(appPage).toHaveURL(new RegExp(`contract=${newContractAddress}`, 'i'), {
       timeout: 30000,
     });
@@ -237,9 +246,8 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Open dialog
+    // Open dialog (wait for button instead of arbitrary timeout)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
     await newEventButton.click();
@@ -284,9 +292,8 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Open dialog
+    // Open dialog (wait for button instead of arbitrary timeout)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
     await newEventButton.click();
@@ -322,9 +329,8 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await appPage.waitForLoadState('networkidle');
     await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Open dialog
+    // Open dialog (wait for button instead of arbitrary timeout)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
     await newEventButton.click();
@@ -333,9 +339,13 @@ test.describe('Create Event Flow', () => {
     const dialogTitle = appPage.locator('h2:has-text("Create New Event")');
     await expect(dialogTitle).toBeVisible({ timeout: 10000 });
 
-    // Wait for upload availability check to complete
-    // The component calls isUploadAvailable() on mount
-    await appPage.waitForTimeout(2000);
+    // Wait for upload availability check to complete by waiting for metadata section
+    await appPage
+      .locator('text=Event Details (stored on Arweave)')
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {
+        // Continue - will check warning below
+      });
 
     // Check if Arweave upload unavailable warning is shown
     // If the Turbo SDK is properly bundled, this warning should NOT appear
@@ -406,11 +416,24 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
-    await dismissWelcomeModal(appPage);
-    await appPage.waitForTimeout(2000);
 
-    // Click "+ New Event" button in AppBar
+    // Wait for app to fully load (includes proper modal dismissal timing)
+    await appPage.waitForLoadState('networkidle');
+    await appPage
+      .waitForFunction(
+        () => {
+          const appDiv = document.getElementById('app');
+          return appDiv && appDiv.innerHTML.length > 100;
+        },
+        { timeout: 30000 }
+      )
+      .catch(() => {});
+
+    // Modal appears via requestAnimationFrame after React renders, so wait a moment
+    await appPage.waitForTimeout(500);
+    await dismissWelcomeModal(appPage);
+
+    // Click "+ New Event" button in AppBar (wait for it instead of arbitrary timeout)
     const newEventButton = appPage.locator('button:has-text("+ New Event")');
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
     await newEventButton.click();
@@ -419,8 +442,13 @@ test.describe('Create Event Flow', () => {
     const dialogTitle = appPage.locator('h2:has-text("Create New Event")');
     await expect(dialogTitle).toBeVisible({ timeout: 10000 });
 
-    // Wait for upload availability check
-    await appPage.waitForTimeout(2000);
+    // Wait for upload availability check by waiting for metadata section
+    await appPage
+      .locator('text=Event Details (stored on Arweave)')
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {
+        // Continue - will check warning below
+      });
 
     // Verify Arweave upload IS available (no warning shown)
     const uploadUnavailableWarning = appPage.locator(
@@ -504,9 +532,7 @@ test.describe('Create Event Flow', () => {
     let transactionConfirmed = false;
 
     for (let i = 0; i < maxSignatures && !transactionConfirmed; i++) {
-      await appPage.waitForTimeout(2000);
-
-      // Check if we've reached success (no more signatures needed)
+      // Check if we've reached success first (no more signatures needed)
       const successVisible = await appPage
         .locator('h2:has-text("Event Created Successfully!")')
         .isVisible()
@@ -516,13 +542,27 @@ test.describe('Create Event Flow', () => {
         break;
       }
 
+      // Wait for MetaMask popup with shorter timeout per iteration
       try {
-        // Try to confirm whatever MetaMask popup is showing (signature or transaction)
+        await context.waitForEvent('page', {
+          predicate: (p: any) => p.url().includes('notification.html'),
+          timeout: 5000,
+        });
         await metamask.confirmTransaction();
         signaturesConfirmed++;
         console.log(`Confirmed MetaMask action ${signaturesConfirmed}`);
       } catch (e) {
-        // No popup to confirm, continue waiting
+        // No popup appeared, check if still creating or already done
+        const isCreating = await appPage
+          .locator('button:has-text("Creating...")')
+          .isVisible()
+          .catch(() => false);
+        if (!isCreating) {
+          // Not creating anymore, check for success
+          break;
+        }
+        // Small delay before next check
+        await appPage.waitForTimeout(500);
         console.log('No MetaMask popup found, continuing...');
       }
     }
@@ -544,11 +584,9 @@ test.describe('Create Event Flow', () => {
     // Click "Go to Event" to navigate to the new event
     const goToEventButton = appPage.locator('[role="dialog"] button:has-text("Go to Event")');
     await goToEventButton.click();
-    await appPage.waitForLoadState('networkidle');
-    await dismissWelcomeModal(appPage);
 
-    // Wait for event info to load
-    await expect(appPage.locator('h4:has-text("Event Info")')).toBeVisible({ timeout: 30000 });
+    // Wait for app to fully load with contract data (includes modal dismissal)
+    await waitForAppLoad(appPage);
 
     // Verify event name is displayed (stored on-chain)
     await expect(appPage.locator(`text=${eventName}`).first()).toBeVisible({ timeout: 10000 });

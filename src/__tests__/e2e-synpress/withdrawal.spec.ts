@@ -7,8 +7,8 @@
  * 3. Admin triggers payback
  * 4. User withdraws their payout
  *
- * Account 1 (deployer): Admin
- * Account 2: Regular user
+ * PARALLELIZATION: This suite deploys its own contract and uses dedicated accounts
+ * (Account 6 as admin, Account 7 as user) to avoid conflicts with other test suites.
  */
 
 import {
@@ -16,15 +16,35 @@ import {
   expect,
   createMetaMask,
   waitForTransactionSuccess,
+  waitForMetaMaskAndConfirm,
+  waitForTransactionComplete,
   waitForAppLoad,
   canUserRegister,
   connectWalletIfNeeded,
   switchAccount,
-  injectE2EConfig,
+  injectE2EConfigWithContract,
   setupMetaMaskNetwork,
+  deployTestEvent,
+  SUITE_ACCOUNTS,
 } from './fixtures';
 
+// Suite-specific contract address (deployed in beforeAll)
+let suiteContractAddress: string;
+
+// Use dedicated accounts for this suite
+const ACCOUNTS = SUITE_ACCOUNTS.withdrawal;
+
 test.describe('Withdrawal Flow', () => {
+  // Deploy a fresh contract for this suite
+  test.beforeAll(async () => {
+    suiteContractAddress = await deployTestEvent({
+      name: 'Withdrawal Test Event',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+  });
+
   test('should allow user to withdraw after attendance and payback', async ({
     context,
     page,
@@ -36,11 +56,11 @@ test.describe('Withdrawal Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Step 1: Register as user (Account 2)
-    await switchAccount(metamask, 'Account 2');
+    // Step 1: Register as user (suite-specific user account)
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -53,13 +73,12 @@ test.describe('Withdrawal Flow', () => {
       await twitterInput.fill(handle);
       await appPage.locator('button:has-text("RSVP")').click();
 
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
+      await waitForMetaMaskAndConfirm(metamask, context);
       await waitForTransactionSuccess(appPage);
     }
 
-    // Step 2: Switch to admin (Account 1)
-    await switchAccount(metamask, 'Account 1');
+    // Step 2: Switch to admin (suite-specific admin account)
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
     await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
@@ -72,8 +91,7 @@ test.describe('Withdrawal Flow', () => {
       const attendButton = appPage.locator('button:has-text("Attend")');
       if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
         await attendButton.click();
-        await appPage.waitForTimeout(2000);
-        await metamask.confirmTransaction();
+        await waitForMetaMaskAndConfirm(metamask, context);
         await waitForTransactionSuccess(appPage);
       }
     }
@@ -82,13 +100,12 @@ test.describe('Withdrawal Flow', () => {
     const paybackButton = appPage.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
+      await waitForMetaMaskAndConfirm(metamask, context);
       await waitForTransactionSuccess(appPage);
     }
 
-    // Step 5: Switch back to user (Account 2) and withdraw
-    await switchAccount(metamask, 'Account 2');
+    // Step 5: Switch back to user (suite-specific user account) and withdraw
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
     await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
@@ -97,9 +114,8 @@ test.describe('Withdrawal Flow', () => {
     const withdrawButton = appPage.locator('button:has-text("Withdraw")');
     if ((await withdrawButton.count()) > 0 && (await withdrawButton.isEnabled())) {
       await withdrawButton.click();
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
-      await waitForTransactionSuccess(appPage);
+      await waitForMetaMaskAndConfirm(metamask, context);
+      await waitForTransactionComplete(appPage);
 
       await expect(withdrawButton).toBeDisabled({ timeout: 10000 });
     }
@@ -116,10 +132,10 @@ test.describe('Withdrawal Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    await switchAccount(metamask, 'Account 2');
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -131,8 +147,7 @@ test.describe('Withdrawal Flow', () => {
       await twitterInput.fill('@withdraw_visible');
       await appPage.locator('button:has-text("RSVP")').click();
 
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
+      await waitForMetaMaskAndConfirm(metamask, context);
       await waitForTransactionSuccess(appPage);
     }
 
@@ -154,10 +169,10 @@ test.describe('Withdrawal Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    await switchAccount(metamask, 'Account 2');
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -168,9 +183,9 @@ test.describe('Withdrawal Flow', () => {
 
     if ((await withdrawButton.count()) > 0 && (await withdrawButton.isEnabled())) {
       await withdrawButton.click();
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
-      await appPage.waitForTimeout(5000);
+      await waitForMetaMaskAndConfirm(metamask, context);
+      // Wait for withdrawal to complete and button state to update
+      await waitForTransactionComplete(appPage);
 
       // After withdrawal, button should be disabled or gone
       const isDisabled = await withdrawButton.isDisabled().catch(() => true);

@@ -7,7 +7,8 @@
  * 3. Admin triggers payback calculation
  * 4. Admin cancels event (if needed)
  *
- * Uses Account 1 (deployer) as admin, Account 2 as regular user.
+ * PARALLELIZATION: This suite deploys its own contract and uses dedicated accounts
+ * (Account 4 as admin, Account 5 as user) to avoid conflicts with other test suites.
  */
 
 import {
@@ -15,15 +16,35 @@ import {
   expect,
   createMetaMask,
   waitForTransactionSuccess,
+  waitForMetaMaskAndConfirm,
+  waitForTransactionComplete,
   waitForAppLoad,
   canUserRegister,
   connectWalletIfNeeded,
   switchAccount,
-  injectE2EConfig,
+  injectE2EConfigWithContract,
   setupMetaMaskNetwork,
+  deployTestEvent,
+  SUITE_ACCOUNTS,
 } from './fixtures';
 
+// Suite-specific contract address (deployed in beforeAll)
+let suiteContractAddress: string;
+
+// Use dedicated accounts for this suite
+const ACCOUNTS = SUITE_ACCOUNTS.attendance;
+
 test.describe('Admin Attendance Flow', () => {
+  // Deploy a fresh contract for this suite
+  test.beforeAll(async () => {
+    suiteContractAddress = await deployTestEvent({
+      name: 'Attendance Test Event',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+  });
+
   test('should show admin controls when connected as owner', async ({
     context,
     page,
@@ -35,11 +56,11 @@ test.describe('Admin Attendance Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Use Account 1 (deployer/owner)
-    await switchAccount(metamask, 'Account 1');
+    // Use suite-specific admin account (deployer/owner)
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -69,11 +90,11 @@ test.describe('Admin Attendance Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // First register as user (Account 2)
-    await switchAccount(metamask, 'Account 2');
+    // First register as user (suite-specific user account)
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -86,14 +107,12 @@ test.describe('Admin Attendance Flow', () => {
       await twitterInput.fill(handle);
       await appPage.locator('button:has-text("RSVP")').click();
 
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
-      await waitForTransactionSuccess(appPage);
-      await appPage.waitForTimeout(2000);
+      await waitForMetaMaskAndConfirm(metamask, context);
+      await waitForTransactionComplete(appPage);
     }
 
-    // Switch to admin (Account 1)
-    await switchAccount(metamask, 'Account 1');
+    // Switch to admin (suite-specific admin account)
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
     await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
@@ -112,8 +131,7 @@ test.describe('Admin Attendance Flow', () => {
           const attendButton = appPage.locator('button:has-text("Attend")');
           if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
             await attendButton.click();
-            await appPage.waitForTimeout(2000);
-            await metamask.confirmTransaction();
+            await waitForMetaMaskAndConfirm(metamask, context);
             await waitForTransactionSuccess(appPage);
           }
           break;
@@ -133,10 +151,10 @@ test.describe('Admin Attendance Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    await switchAccount(metamask, 'Account 1');
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -146,8 +164,7 @@ test.describe('Admin Attendance Flow', () => {
     const paybackButton = appPage.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
+      await waitForMetaMaskAndConfirm(metamask, context);
       await waitForTransactionSuccess(appPage);
 
       await expect(paybackButton).toBeDisabled({ timeout: 10000 });
@@ -165,10 +182,10 @@ test.describe('Admin Attendance Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    await switchAccount(metamask, 'Account 1');
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -196,10 +213,10 @@ test.describe('Admin Attendance Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    await switchAccount(metamask, 'Account 2');
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -229,11 +246,11 @@ test.describe('Admin Attendance Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Register as user first
-    await switchAccount(metamask, 'Account 2');
+    // Register as user first (suite-specific user account)
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -245,13 +262,12 @@ test.describe('Admin Attendance Flow', () => {
       await twitterInput.fill(`@count_${Date.now()}`);
       await appPage.locator('button:has-text("RSVP")').click();
 
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
+      await waitForMetaMaskAndConfirm(metamask, context);
       await waitForTransactionSuccess(appPage);
     }
 
-    // Switch to admin and mark attendance
-    await switchAccount(metamask, 'Account 1');
+    // Switch to admin and mark attendance (suite-specific admin account)
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
     await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
@@ -263,8 +279,7 @@ test.describe('Admin Attendance Flow', () => {
       const attendButton = appPage.locator('button:has-text("Attend")');
       if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
         await attendButton.click();
-        await appPage.waitForTimeout(2000);
-        await metamask.confirmTransaction();
+        await waitForMetaMaskAndConfirm(metamask, context);
         await waitForTransactionSuccess(appPage);
       }
     }

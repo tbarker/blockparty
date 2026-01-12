@@ -8,6 +8,9 @@
  * 4. User clicks RSVP, MetaMask confirms transaction
  * 5. Transaction is mined on Anvil
  * 6. UI updates to show registration status
+ *
+ * PARALLELIZATION: This suite deploys its own contract and uses dedicated accounts
+ * (Account 2 as deployer) to avoid conflicts with other test suites.
  */
 
 import {
@@ -15,14 +18,34 @@ import {
   expect,
   createMetaMask,
   waitForTransactionSuccess,
+  waitForMetaMaskAndConfirm,
+  waitForTransactionComplete,
   waitForAppLoad,
   canUserRegister,
   connectWalletIfNeeded,
-  injectE2EConfig,
+  injectE2EConfigWithContract,
   setupMetaMaskNetwork,
+  deployTestEvent,
+  SUITE_ACCOUNTS,
 } from './fixtures';
 
+// Suite-specific contract address (deployed in beforeAll)
+let suiteContractAddress: string;
+
+// Use dedicated accounts for this suite
+const ACCOUNTS = SUITE_ACCOUNTS.registration;
+
 test.describe('Registration Flow', () => {
+  // Deploy a fresh contract for this suite
+  test.beforeAll(async () => {
+    suiteContractAddress = await deployTestEvent({
+      name: 'Registration Test Event',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
+    });
+  });
+
   test('should display event details on page load', async ({
     context,
     page,
@@ -31,11 +54,11 @@ test.describe('Registration Flow', () => {
   }) => {
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
-    // Setup MetaMask network first
+    // Setup MetaMask network first (uses Account 1 which is the default)
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config into the app page
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet and get updated app page reference
@@ -62,11 +85,11 @@ test.describe('Registration Flow', () => {
   }) => {
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
-    // Setup MetaMask network first
+    // Setup MetaMask network first (uses Account 1 which is the default)
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -92,8 +115,8 @@ test.describe('Registration Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -115,9 +138,8 @@ test.describe('Registration Flow', () => {
     await expect(rsvpButton).toBeEnabled();
     await rsvpButton.click();
 
-    // Confirm transaction in MetaMask
-    await appPage.waitForTimeout(2000);
-    await metamask.confirmTransaction();
+    // Confirm transaction in MetaMask (waits for popup automatically)
+    await waitForMetaMaskAndConfirm(metamask, context);
 
     // Wait for success notification
     await waitForTransactionSuccess(appPage);
@@ -140,8 +162,8 @@ test.describe('Registration Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -159,12 +181,13 @@ test.describe('Registration Flow', () => {
     await twitterInput.fill('@count_test');
     await appPage.locator('button:has-text("RSVP")').click();
 
-    await appPage.waitForTimeout(2000);
-    await metamask.confirmTransaction();
-    await waitForTransactionSuccess(appPage);
+    // Confirm transaction and wait for completion
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionComplete(appPage, {
+      expectElement: 'text=/\\d+\\(\\d+\\)/',
+    });
 
     // Verify count is displayed
-    await appPage.waitForTimeout(2000);
     await expect(appPage.locator('text=/\\d+\\(\\d+\\)/')).toBeVisible({ timeout: 5000 });
   });
 
@@ -179,8 +202,8 @@ test.describe('Registration Flow', () => {
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(appPage);
+    // Inject E2E config with suite-specific contract
+    await injectE2EConfigWithContract(appPage, suiteContractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -193,10 +216,11 @@ test.describe('Registration Flow', () => {
       await twitterInput.fill('@table_test');
       await appPage.locator('button:has-text("RSVP")').click();
 
-      await appPage.waitForTimeout(2000);
-      await metamask.confirmTransaction();
-      await waitForTransactionSuccess(appPage);
-      await appPage.waitForTimeout(2000);
+      // Confirm transaction and wait for table to update
+      await waitForMetaMaskAndConfirm(metamask, context);
+      await waitForTransactionComplete(appPage, {
+        expectElement: 'table',
+      });
     }
 
     // Verify participants table

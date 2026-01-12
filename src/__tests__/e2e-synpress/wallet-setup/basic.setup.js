@@ -27,8 +27,8 @@ module.exports = defineWalletSetup(PASSWORD, async (context, walletPage) => {
   await metamask.importWallet(SEED_PHRASE);
 
   // Add a second account for multi-user tests
-  // This creates "Account 2" which is needed for attendance/withdrawal tests
-  await metamask.addNewAccount('Account 2');
+  // Using "User2" to avoid conflicts with MetaMask's auto-naming ("Account N")
+  await metamask.addNewAccount('User2');
 });
 
 module.exports.PASSWORD = PASSWORD;

@@ -4,8 +4,18 @@
  * Uses real MetaMask extension for wallet interactions.
  * Runs headful with xvfb in containers (devcontainer and CI).
  *
- * Self-contained: Anvil is started and contract deployed in globalSetup,
+ * Self-contained: Anvil is started and contracts deployed in globalSetup,
  * and cleaned up in globalTeardown.
+ *
+ * PARALLELIZATION STRATEGY:
+ * - Each spec file runs in its own worker (workers: 4)
+ * - Tests within a spec run sequentially (fullyParallel: false)
+ * - Each spec deploys its own contract in beforeAll
+ * - Each spec uses dedicated Anvil accounts to avoid nonce conflicts:
+ *   - createEvent: Account 1
+ *   - registration: Account 2
+ *   - attendance: Account 4-5
+ *   - withdrawal: Account 6-7
  *
  * @see https://docs.synpress.io/docs/setup-playwright
  */

@@ -443,7 +443,7 @@ export default defineConfig({
   // Don't need Anvil for this test (uses Sepolia)
   globalSetup: undefined,
   globalTeardown: undefined,
-
+ 
   // Web server still needed
   webServer: {
     command: 'npm run start',
@@ -571,7 +571,6 @@ jobs:
 | Sepolia RPC rate limits | Use premium RPC endpoint or retry logic |
 | Arweave gateway slow | 3-minute timeout on upload confirmation |
 | MetaMask popup timing | Explicit waits before transaction confirmation |
-| Test flakiness | Serial test execution, proper state sharing |
 
 ---
 

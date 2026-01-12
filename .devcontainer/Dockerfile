@@ -1,7 +1,7 @@
 # BlockParty Development Container
 # Based on Microsoft's Node.js devcontainer with additional tooling for Ethereum development
 
-FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+FROM mcr.microsoft.com/devcontainers/typescript-node:24-trixie
 
 # Install system dependencies for native module compilation and Ethereum development
 # Also includes dependencies required by Playwright for E2E testing
@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     git \
     curl \
+    # For Worktrunk
+    rust-all \
     # Playwright/Chromium dependencies
     libnss3 \
     libnspr4 \
@@ -41,6 +43,9 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
+
+# Worktrunk tool
+RUN cargo install cargo --force && cargo install worktrunk && wt config shell install
 
 # Set up workspace directory
 WORKDIR /workspaces/blockparty

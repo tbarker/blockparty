@@ -70,4 +70,10 @@ echo "  npm run deploy:local     - Deploy to local Anvil node"
 echo ""
 echo "AI Tools:"
 echo "  opencode                 - Start opencode AI assistant"
+echo "  clauded                  - Claude Code with --dangerously-skip-permissions"
 echo ""
+
+# Add claude alias to bashrc if not already present
+if ! grep -q 'alias clauded=' ~/.bashrc 2>/dev/null; then
+    echo 'alias clauded="claude --dangerously-skip-permissions"' >> ~/.bashrc
+fi

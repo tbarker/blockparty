@@ -62,8 +62,8 @@ test.describe('Withdrawal Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    // Register
-    const handle = `@withdraw_${Date.now()}`;
+    // Register (handle max 15 chars after @)
+    const handle = `@wdr${String(Date.now()).slice(-6)}`;
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
     await twitterInput.fill(handle);
     await appPage.locator('button:has-text("RSVP")').click();
@@ -149,7 +149,7 @@ test.describe('Withdrawal Flow', () => {
 
     // Register
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill('@withdraw_visible');
+    await twitterInput.fill('@wdr_visible');
     await appPage.locator('button:has-text("RSVP")').click();
 
     await waitForMetaMaskAndConfirm(metamask, context);
@@ -195,8 +195,8 @@ test.describe('Withdrawal Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    // Register
-    const handle = `@double_${Date.now()}`;
+    // Register (handle max 15 chars after @)
+    const handle = `@dbl${String(Date.now()).slice(-6)}`;
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
     await twitterInput.fill(handle);
     await appPage.locator('button:has-text("RSVP")').click();

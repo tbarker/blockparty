@@ -10,6 +10,7 @@ import Box from '@mui/material/Box';
 import EditIcon from '@mui/icons-material/Edit';
 import participantStatus from '../util/participantStatus';
 import MetadataEditor from './MetadataEditor';
+import { schemas } from '../util/validation';
 
 const buttonStyle = { margin: '12px' };
 
@@ -24,6 +25,8 @@ class FormInput extends React.Component {
       participants: [],
       detail: {},
       showMetadataEditor: false,
+      nameError: null,
+      nameTouched: false,
     };
   }
 
@@ -61,9 +64,15 @@ class FormInput extends React.Component {
       case 'attend':
         args.push(this.state.attendees);
         break;
-      case 'register':
+      case 'register': {
+        // Validate name before registering
+        const nameError = this.validateName();
+        if (nameError) {
+          return; // Don't proceed if validation fails
+        }
         args.push(this.state.name);
         break;
+      }
       default:
         break;
     }
@@ -84,6 +93,8 @@ class FormInput extends React.Component {
     this.setState({
       name: '',
       attendees: [],
+      nameError: null,
+      nameTouched: false,
     });
     this.props.eventEmitter.emit('attendees', []);
   }
@@ -148,9 +159,30 @@ class FormInput extends React.Component {
   }
 
   handleName(e) {
-    this.setState({
-      name: e.target.value,
+    const value = e.target.value;
+    this.setState(prevState => {
+      const newState = { name: value };
+
+      // Validate if field has been touched
+      if (prevState.nameTouched) {
+        newState.nameError = schemas.registration.participantName(value);
+      }
+
+      return newState;
     });
+  }
+
+  handleNameBlur = () => {
+    this.setState(prevState => ({
+      nameTouched: true,
+      nameError: schemas.registration.participantName(prevState.name),
+    }));
+  };
+
+  validateName() {
+    const error = schemas.registration.participantName(this.state.name);
+    this.setState({ nameError: error, nameTouched: true });
+    return error;
   }
 
   openMetadataEditor = () => {
@@ -309,15 +341,20 @@ class FormInput extends React.Component {
 
     let nameField = null;
     if (this.showRegister()) {
+      const nameError = this.state.nameTouched ? this.state.nameError : null;
       nameField = (
         <TextField
-          placeholder="@twitter_handle (required)"
+          placeholder="@twitter_handle"
           label="Twitter handle *"
           value={this.state.name || ''}
           onChange={this.handleName.bind(this)}
+          onBlur={this.handleNameBlur}
           variant="outlined"
           size="small"
-          sx={{ margin: '0 5px' }}
+          required
+          error={!!nameError}
+          helperText={nameError || 'Enter your Twitter handle (e.g., @username)'}
+          sx={{ margin: '0 5px', minWidth: '280px' }}
         />
       );
     }

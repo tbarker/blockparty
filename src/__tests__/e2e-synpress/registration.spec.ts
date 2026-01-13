@@ -146,7 +146,7 @@ test.describe('Registration Flow', () => {
 
     // Enter Twitter handle
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill('@synpress_user');
+    await twitterInput.fill('@synpress_usr');
 
     // Click RSVP button
     const rsvpButton = appPage.locator('button:has-text("RSVP")');
@@ -160,7 +160,7 @@ test.describe('Registration Flow', () => {
     await waitForTransactionSuccess(appPage);
 
     // Verify participant appears in the list
-    await expect(appPage.locator('text=@synpress_user')).toBeVisible({ timeout: 10000 });
+    await expect(appPage.locator('text=@synpress_usr')).toBeVisible({ timeout: 10000 });
 
     // Verify RSVP button is now disabled
     await expect(rsvpButton).toBeDisabled();

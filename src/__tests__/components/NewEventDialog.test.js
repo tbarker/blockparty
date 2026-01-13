@@ -113,7 +113,9 @@ describe('NewEventDialog', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Event name is required')).toBeInTheDocument();
+      // Error appears in both Alert and helperText, so use getAllByText
+      const errors = screen.getAllByText('Event name is required');
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 
@@ -138,7 +140,9 @@ describe('NewEventDialog', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Deposit must be a positive number')).toBeInTheDocument();
+      // Error appears in both Alert and helperText, so use getAllByText
+      const errors = screen.getAllByText('Deposit must be at least 0.001');
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 
@@ -161,7 +165,9 @@ describe('NewEventDialog', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Deposit cannot exceed 10 ETH')).toBeInTheDocument();
+      // Error appears in both Alert and helperText, so use getAllByText
+      const errors = screen.getAllByText('Deposit must be no more than 10');
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 
@@ -184,7 +190,9 @@ describe('NewEventDialog', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Max participants must be at least 1')).toBeInTheDocument();
+      // Error appears in both Alert and helperText, so use getAllByText
+      const errors = screen.getAllByText('Max participants must be at least 1');
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 
@@ -207,7 +215,9 @@ describe('NewEventDialog', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Max participants cannot exceed 1000')).toBeInTheDocument();
+      // Error appears in both Alert and helperText, so use getAllByText
+      const errors = screen.getAllByText('Max participants must be no more than 1000');
+      expect(errors.length).toBeGreaterThan(0);
     });
   });
 

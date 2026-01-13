@@ -171,26 +171,34 @@ export async function injectE2EConfigFactoryOnly(page: any): Promise<void> {
 /**
  * Dismiss the welcome/instruction modal if it appears.
  * The modal shows on first visit and blocks all interactions until dismissed.
+ * The modal renders via requestAnimationFrame after React mounts, which can be delayed in CI.
  */
 export async function dismissWelcomeModal(page: any): Promise<void> {
-  try {
-    // The MuiDialog modal contains "Welcome to BlockParty" title and an "Ok" button
-    const modalDialog = page.locator('.MuiDialog-root');
-    const okButton = page.locator('.MuiDialog-root button:has-text("Ok")');
+  // Retry multiple times - modal may appear after a delay in CI environments
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // The MuiDialog modal contains "Welcome to BlockParty" title and an "Ok" button
+      const modalDialog = page.locator('.MuiDialog-root');
+      const okButton = page.locator('.MuiDialog-root button:has-text("Ok")');
 
-    // Quick check if modal is present (appears via requestAnimationFrame, should be fast)
-    const isModalVisible = await modalDialog.isVisible({ timeout: 1000 }).catch(() => false);
+      // Wait for modal to potentially appear (can be delayed via requestAnimationFrame)
+      const isModalVisible = await modalDialog.isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (isModalVisible) {
-      // Wait for the Ok button to be clickable and click it
-      await okButton.waitFor({ state: 'visible', timeout: 3000 });
-      await okButton.click();
+      if (isModalVisible) {
+        // Wait for the Ok button to be clickable and click it
+        await okButton.waitFor({ state: 'visible', timeout: 5000 });
+        // Use force:true to click even if something is in front (modal backdrop edge cases)
+        await okButton.click({ force: true });
 
-      // Wait for modal to fully close
-      await modalDialog.waitFor({ state: 'hidden', timeout: 3000 });
+        // Wait for modal to fully close
+        await modalDialog.waitFor({ state: 'hidden', timeout: 5000 });
+        return; // Successfully dismissed
+      }
+    } catch {
+      // Modal may have already closed or page state changed - try again
     }
-  } catch {
-    // Modal may have already closed or page state changed - continue
+    // Small delay before retry
+    await page.waitForTimeout(500);
   }
 }
 

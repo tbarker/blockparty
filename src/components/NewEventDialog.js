@@ -26,6 +26,7 @@ import {
   isUploadAvailable,
   waitForArweaveConfirmation,
 } from '../util/arweaveUpload';
+import { validators, schemas, validateFields } from '../util/validation';
 
 // Cooling period options (in seconds)
 const COOLING_PERIODS = [
@@ -78,6 +79,11 @@ class NewEventDialog extends Component {
       success: null,
       newContractAddress: null,
       uploadAvailable: true,
+
+      // Field-level validation errors
+      fieldErrors: {},
+      // Track which fields have been touched (for showing errors)
+      touched: {},
     };
   }
 
@@ -103,18 +109,54 @@ class NewEventDialog extends Component {
   }
 
   handleChange = field => event => {
-    this.setState({ [field]: event.target.value, error: null });
+    const value = event.target.value;
+    this.setState(prevState => {
+      const newState = { [field]: value, error: null };
+
+      // Validate field if it has been touched
+      if (prevState.touched[field]) {
+        const fieldError = this.validateField(field, value);
+        newState.fieldErrors = {
+          ...prevState.fieldErrors,
+          [field]: fieldError,
+        };
+      }
+
+      return newState;
+    });
+  };
+
+  handleBlur = field => () => {
+    this.setState(prevState => {
+      const fieldError = this.validateField(field, prevState[field]);
+      return {
+        touched: { ...prevState.touched, [field]: true },
+        fieldErrors: { ...prevState.fieldErrors, [field]: fieldError },
+      };
+    });
+  };
+
+  validateField = (field, value) => {
+    // Use schema validators for known fields
+    const validator = schemas.eventCreation[field];
+    if (validator) {
+      return validator(value);
+    }
+
+    // Special validation for endDate (must be after start date)
+    if (field === 'endDate' && value && this.state.date) {
+      return validators.dateAfter(value, this.state.date, { fieldName: 'End date' });
+    }
+
+    return null;
   };
 
   handleFileChange = event => {
     const file = event.target.files[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        this.setState({ error: 'Please select an image file' });
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        this.setState({ error: 'Image must be smaller than 5MB' });
+      const fileError = validators.imageFile(file, { maxSizeMB: 5 });
+      if (fileError) {
+        this.setState({ error: fileError });
         return;
       }
       this.setState({
@@ -174,32 +216,39 @@ class NewEventDialog extends Component {
   }
 
   validateForm() {
-    const { name, deposit, limitOfParticipants } = this.state;
+    const { name, deposit, limitOfParticipants, mapUrl, websiteUrl, twitterUrl, date, endDate } =
+      this.state;
 
-    if (!name || name.trim().length === 0) {
-      return 'Event name is required';
-    }
-    if (name.length > 100) {
-      return 'Event name must be less than 100 characters';
-    }
+    // Validate all fields using the schema
+    const errors = validateFields(
+      { name, deposit, limitOfParticipants, mapUrl, websiteUrl, twitterUrl },
+      schemas.eventCreation
+    );
 
-    const depositNum = parseFloat(deposit);
-    if (isNaN(depositNum) || depositNum <= 0) {
-      return 'Deposit must be a positive number';
-    }
-    if (depositNum > 10) {
-      return 'Deposit cannot exceed 10 ETH';
-    }
-
-    const limitNum = parseInt(limitOfParticipants, 10);
-    if (isNaN(limitNum) || limitNum < 1) {
-      return 'Max participants must be at least 1';
-    }
-    if (limitNum > 1000) {
-      return 'Max participants cannot exceed 1000';
+    // Additional validation for date range
+    if (date && endDate) {
+      const dateError = validators.dateAfter(endDate, date, { fieldName: 'End date' });
+      if (dateError) {
+        errors.endDate = dateError;
+      }
     }
 
-    return null;
+    // Update field errors state and mark all as touched
+    const allTouched = {
+      name: true,
+      deposit: true,
+      limitOfParticipants: true,
+      mapUrl: true,
+      websiteUrl: true,
+      twitterUrl: true,
+      endDate: true,
+    };
+
+    this.setState({ fieldErrors: errors, touched: allTouched });
+
+    // Return first error message for the alert, or null if valid
+    const errorMessages = Object.values(errors).filter(Boolean);
+    return errorMessages.length > 0 ? errorMessages[0] : null;
   }
 
   handleSubmit = async () => {
@@ -337,7 +386,15 @@ class NewEventDialog extends Component {
       error: null,
       success: null,
       newContractAddress: null,
+      fieldErrors: {},
+      touched: {},
     });
+  };
+
+  // Helper to get error state for a field
+  getFieldError = field => {
+    const { fieldErrors, touched } = this.state;
+    return touched[field] ? fieldErrors[field] : null;
   };
 
   render() {
@@ -433,9 +490,11 @@ class NewEventDialog extends Component {
               label="Event Name"
               value={this.state.name}
               onChange={this.handleChange('name')}
+              onBlur={this.handleBlur('name')}
               disabled={creating || !factoryAvailable}
               required
-              helperText="The name of your event (required)"
+              error={!!this.getFieldError('name')}
+              helperText={this.getFieldError('name') || 'The name of your event (required)'}
             />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -445,13 +504,15 @@ class NewEventDialog extends Component {
                 type="number"
                 value={this.state.deposit}
                 onChange={this.handleChange('deposit')}
+                onBlur={this.handleBlur('deposit')}
                 disabled={creating || !factoryAvailable}
                 required
+                error={!!this.getFieldError('deposit')}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">ETH</InputAdornment>,
                 }}
                 inputProps={{ min: 0.001, max: 10, step: 0.01 }}
-                helperText="Amount each participant must deposit"
+                helperText={this.getFieldError('deposit') || 'Amount each participant must deposit (0.001-10 ETH)'}
               />
 
               <TextField
@@ -460,10 +521,12 @@ class NewEventDialog extends Component {
                 type="number"
                 value={this.state.limitOfParticipants}
                 onChange={this.handleChange('limitOfParticipants')}
+                onBlur={this.handleBlur('limitOfParticipants')}
                 disabled={creating || !factoryAvailable}
                 required
+                error={!!this.getFieldError('limitOfParticipants')}
                 inputProps={{ min: 1, max: 1000 }}
-                helperText="Maximum number of participants"
+                helperText={this.getFieldError('limitOfParticipants') || 'Maximum number of participants (1-1000)'}
               />
             </Box>
 
@@ -499,6 +562,7 @@ class NewEventDialog extends Component {
                 type="datetime-local"
                 value={this.state.date}
                 onChange={this.handleChange('date')}
+                onBlur={this.handleBlur('date')}
                 disabled={creating || !factoryAvailable}
                 InputLabelProps={{ shrink: true }}
               />
@@ -508,7 +572,10 @@ class NewEventDialog extends Component {
                 type="datetime-local"
                 value={this.state.endDate}
                 onChange={this.handleChange('endDate')}
+                onBlur={this.handleBlur('endDate')}
                 disabled={creating || !factoryAvailable}
+                error={!!this.getFieldError('endDate')}
+                helperText={this.getFieldError('endDate')}
                 InputLabelProps={{ shrink: true }}
               />
             </Box>
@@ -536,7 +603,10 @@ class NewEventDialog extends Component {
               label="Map URL"
               value={this.state.mapUrl}
               onChange={this.handleChange('mapUrl')}
+              onBlur={this.handleBlur('mapUrl')}
               disabled={creating || !factoryAvailable}
+              error={!!this.getFieldError('mapUrl')}
+              helperText={this.getFieldError('mapUrl')}
               placeholder="https://maps.google.com/..."
             />
 
@@ -563,7 +633,10 @@ class NewEventDialog extends Component {
                 label="Website"
                 value={this.state.websiteUrl}
                 onChange={this.handleChange('websiteUrl')}
+                onBlur={this.handleBlur('websiteUrl')}
                 disabled={creating || !factoryAvailable}
+                error={!!this.getFieldError('websiteUrl')}
+                helperText={this.getFieldError('websiteUrl')}
                 placeholder="https://..."
               />
               <TextField
@@ -571,7 +644,10 @@ class NewEventDialog extends Component {
                 label="Twitter/X"
                 value={this.state.twitterUrl}
                 onChange={this.handleChange('twitterUrl')}
+                onBlur={this.handleBlur('twitterUrl')}
                 disabled={creating || !factoryAvailable}
+                error={!!this.getFieldError('twitterUrl')}
+                helperText={this.getFieldError('twitterUrl')}
                 placeholder="https://twitter.com/..."
               />
             </Box>

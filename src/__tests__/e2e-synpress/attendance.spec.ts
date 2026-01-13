@@ -116,8 +116,8 @@ test.describe('Admin Attendance Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    // Register a user
-    const handle = `@attend_${Date.now()}`;
+    // Register a user (handle max 15 chars after @)
+    const handle = `@att${String(Date.now()).slice(-6)}`;
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
     await twitterInput.fill(handle);
     await appPage.locator('button:has-text("RSVP")').click();
@@ -187,8 +187,8 @@ test.describe('Admin Attendance Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    // Register a participant
-    const handle = `@payback_${Date.now()}`;
+    // Register a participant (handle max 15 chars after @)
+    const handle = `@pay${String(Date.now()).slice(-6)}`;
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
     await twitterInput.fill(handle);
     await appPage.locator('button:has-text("RSVP")').click();
@@ -345,9 +345,9 @@ test.describe('Admin Attendance Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    // Register a user
+    // Register a user (handle max 15 chars after @)
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill(`@count_${Date.now()}`);
+    await twitterInput.fill(`@cnt${String(Date.now()).slice(-6)}`);
     await appPage.locator('button:has-text("RSVP")').click();
 
     await waitForMetaMaskAndConfirm(metamask, context);

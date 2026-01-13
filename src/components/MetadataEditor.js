@@ -18,6 +18,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { uploadEventMetadata, isUploadAvailable, getUploadCost } from '../util/arweaveUpload';
 import { arweaveUriToGatewayUrl } from '../util/arweaveMetadata';
+import { validators, schemas } from '../util/validation';
 
 /**
  * MetadataEditor - Dialog component for editing event metadata
@@ -59,6 +60,11 @@ class MetadataEditor extends Component {
 
       // Error handling
       error: null,
+
+      // Field-level validation errors
+      fieldErrors: {},
+      // Track which fields have been touched
+      touched: {},
     };
   }
 
@@ -117,21 +123,61 @@ class MetadataEditor extends Component {
   }
 
   handleChange = field => event => {
-    this.setState({ [field]: event.target.value, error: null });
+    const value = event.target.value;
+    this.setState(prevState => {
+      const newState = { [field]: value, error: null };
+
+      // Validate field if it has been touched
+      if (prevState.touched[field]) {
+        const fieldError = this.validateField(field, value);
+        newState.fieldErrors = {
+          ...prevState.fieldErrors,
+          [field]: fieldError,
+        };
+      }
+
+      return newState;
+    });
+  };
+
+  handleBlur = field => () => {
+    this.setState(prevState => {
+      const fieldError = this.validateField(field, prevState[field]);
+      return {
+        touched: { ...prevState.touched, [field]: true },
+        fieldErrors: { ...prevState.fieldErrors, [field]: fieldError },
+      };
+    });
+  };
+
+  validateField = (field, value) => {
+    // Use schema validators for known fields
+    const validator = schemas.metadataEditor[field];
+    if (validator) {
+      return validator(value);
+    }
+
+    // Special validation for endDate (must be after start date)
+    if (field === 'endDate' && value && this.state.date) {
+      return validators.dateAfter(value, this.state.date, { fieldName: 'End date' });
+    }
+
+    return null;
+  };
+
+  // Helper to get error state for a field
+  getFieldError = field => {
+    const { fieldErrors, touched } = this.state;
+    return touched[field] ? fieldErrors[field] : null;
   };
 
   handleFileChange = async event => {
     const file = event.target.files[0];
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        this.setState({ error: 'Please select an image file' });
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        this.setState({ error: 'Image must be smaller than 5MB' });
+      // Validate file using validator
+      const fileError = validators.imageFile(file, { maxSizeMB: 5 });
+      if (fileError) {
+        this.setState({ error: fileError });
         return;
       }
 
@@ -213,11 +259,47 @@ class MetadataEditor extends Component {
     }
   };
 
+  validateForm = () => {
+    const { mapUrl, websiteUrl, twitterUrl, date, endDate } = this.state;
+
+    // Validate URL fields
+    const errors = {};
+
+    const mapUrlError = validators.url(mapUrl, { fieldName: 'Map URL', allowEmpty: true });
+    if (mapUrlError) errors.mapUrl = mapUrlError;
+
+    const websiteUrlError = validators.url(websiteUrl, { fieldName: 'Website URL', allowEmpty: true });
+    if (websiteUrlError) errors.websiteUrl = websiteUrlError;
+
+    const twitterUrlError = validators.url(twitterUrl, { fieldName: 'Twitter URL', allowEmpty: true });
+    if (twitterUrlError) errors.twitterUrl = twitterUrlError;
+
+    // Validate date range
+    if (date && endDate) {
+      const dateError = validators.dateAfter(endDate, date, { fieldName: 'End date' });
+      if (dateError) errors.endDate = dateError;
+    }
+
+    // Mark all validated fields as touched
+    const allTouched = { mapUrl: true, websiteUrl: true, twitterUrl: true, endDate: true };
+    this.setState({ fieldErrors: errors, touched: allTouched });
+
+    const errorMessages = Object.values(errors).filter(Boolean);
+    return errorMessages.length > 0 ? errorMessages[0] : null;
+  };
+
   handleSubmit = async () => {
     const { provider, onUpdateContract, onClose } = this.props;
 
     if (!provider) {
       this.setState({ error: 'No wallet provider available' });
+      return;
+    }
+
+    // Validate form before submitting
+    const validationError = this.validateForm();
+    if (validationError) {
+      this.setState({ error: validationError });
       return;
     }
 
@@ -316,6 +398,7 @@ class MetadataEditor extends Component {
                 type="datetime-local"
                 value={this.state.date}
                 onChange={this.handleChange('date')}
+                onBlur={this.handleBlur('date')}
                 disabled={uploading}
                 InputLabelProps={{ shrink: true }}
               />
@@ -325,7 +408,10 @@ class MetadataEditor extends Component {
                 type="datetime-local"
                 value={this.state.endDate}
                 onChange={this.handleChange('endDate')}
+                onBlur={this.handleBlur('endDate')}
                 disabled={uploading}
+                error={!!this.getFieldError('endDate')}
+                helperText={this.getFieldError('endDate')}
                 InputLabelProps={{ shrink: true }}
               />
             </Box>
@@ -357,7 +443,10 @@ class MetadataEditor extends Component {
               label="Map URL"
               value={this.state.mapUrl}
               onChange={this.handleChange('mapUrl')}
+              onBlur={this.handleBlur('mapUrl')}
               disabled={uploading}
+              error={!!this.getFieldError('mapUrl')}
+              helperText={this.getFieldError('mapUrl')}
               placeholder="https://maps.google.com/..."
             />
 
@@ -387,7 +476,10 @@ class MetadataEditor extends Component {
                 label="Website"
                 value={this.state.websiteUrl}
                 onChange={this.handleChange('websiteUrl')}
+                onBlur={this.handleBlur('websiteUrl')}
                 disabled={uploading}
+                error={!!this.getFieldError('websiteUrl')}
+                helperText={this.getFieldError('websiteUrl')}
                 placeholder="https://..."
               />
               <TextField
@@ -395,7 +487,10 @@ class MetadataEditor extends Component {
                 label="Twitter/X"
                 value={this.state.twitterUrl}
                 onChange={this.handleChange('twitterUrl')}
+                onBlur={this.handleBlur('twitterUrl')}
                 disabled={uploading}
+                error={!!this.getFieldError('twitterUrl')}
+                helperText={this.getFieldError('twitterUrl')}
                 placeholder="https://twitter.com/..."
               />
             </Box>

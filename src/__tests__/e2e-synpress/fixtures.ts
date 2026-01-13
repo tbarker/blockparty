@@ -81,8 +81,10 @@ export async function waitForMetaMaskAndConfirm(
   context: any,
   options?: { timeout?: number }
 ): Promise<void> {
-  // Reduced from 30s to 5s - on Anvil, MetaMask popups appear in <2s
-  const timeout = options?.timeout || 5000;
+  // CI environments are slower - use 15s timeout (was 5s which is too aggressive for CI)
+  // Local dev can pass a shorter timeout if needed
+  const isCI = process.env.CI === 'true';
+  const timeout = options?.timeout || (isCI ? 15000 : 5000);
 
   // Wait for a MetaMask notification page to appear
   // Synpress's confirmTransaction() has internal retries, but we want to ensure
@@ -94,6 +96,12 @@ export async function waitForMetaMaskAndConfirm(
     });
   } catch {
     // Page might already exist or transaction already initiated, continue
+  }
+
+  // Small delay to ensure the notification page is fully loaded
+  // This helps with CI where page rendering may be slower
+  if (isCI) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   await metamask.confirmTransaction();
@@ -276,35 +284,51 @@ export async function addAndSwitchToAnvilNetwork(metamask: MetaMask): Promise<vo
 
 /**
  * Find the app page from context (not the MetaMask extension page)
+ * In CI, pages may be slow to appear, so we retry if needed.
  */
-export async function getAppPage(context: any): Promise<any> {
-  const pages = context.pages();
+export async function getAppPage(context: any, options?: { timeout?: number }): Promise<any> {
+  const timeout = options?.timeout || 10000;
+  const startTime = Date.now();
 
-  // Find the page that's on localhost:3000 (our app) by checking URL
-  for (let i = 0; i < pages.length; i++) {
-    const url = pages[i].url();
-    if (url.includes('localhost:3000')) {
-      return pages[i];
+  while (Date.now() - startTime < timeout) {
+    const pages = context.pages();
+
+    // Find the page that's on localhost:3000 (our app) by checking URL
+    for (let i = 0; i < pages.length; i++) {
+      const url = pages[i].url();
+      if (url.includes('localhost:3000')) {
+        return pages[i];
+      }
     }
+
+    // If not found, look for about:blank (might be the initial page)
+    for (let i = 0; i < pages.length; i++) {
+      const url = pages[i].url();
+      if (url === 'about:blank') {
+        return pages[i];
+      }
+    }
+
+    // If not found, return the first non-extension page
+    for (let i = 0; i < pages.length; i++) {
+      const url = pages[i].url();
+      if (!url.startsWith('chrome-extension://')) {
+        return pages[i];
+      }
+    }
+
+    // If pages array has items but none match criteria, return first one
+    if (pages.length > 0) {
+      return pages[0];
+    }
+
+    // No pages found yet, wait a bit and retry
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  // If not found, look for about:blank (might be the initial page)
-  for (let i = 0; i < pages.length; i++) {
-    const url = pages[i].url();
-    if (url === 'about:blank') {
-      return pages[i];
-    }
-  }
-
-  // If not found, return the first non-extension page
-  for (let i = 0; i < pages.length; i++) {
-    const url = pages[i].url();
-    if (!url.startsWith('chrome-extension://')) {
-      return pages[i];
-    }
-  }
-
-  return pages[0];
+  // Timeout reached - create a new page as fallback
+  console.warn('[getAppPage] No pages found after timeout, creating new page');
+  return await context.newPage();
 }
 
 /**
@@ -330,13 +354,15 @@ export async function connectWalletIfNeeded(
   metamask: MetaMask,
   context: any
 ): Promise<any> {
+  const isCI = process.env.CI === 'true';
+
   // First, dismiss any welcome/instruction modal that might be blocking
   await dismissWelcomeModal(page);
 
   // Check if already connected - RainbowKit shows account address when connected
   const isAlreadyConnected = await page
     .locator('[data-testid="rk-account-button"], button:has-text("0x")')
-    .isVisible({ timeout: 3000 })
+    .isVisible({ timeout: isCI ? 5000 : 3000 })
     .catch(() => false);
 
   if (isAlreadyConnected) {
@@ -348,7 +374,7 @@ export async function connectWalletIfNeeded(
   const rainbowKitConnectButton = page.locator('button:has-text("Connect Wallet")');
 
   // Wait for the button to be visible (may take time after modal dismissal)
-  await rainbowKitConnectButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
+  await rainbowKitConnectButton.waitFor({ state: 'visible', timeout: isCI ? 15000 : 10000 }).catch(() => {
     console.log('Connect Wallet button not found');
   });
 
@@ -358,29 +384,39 @@ export async function connectWalletIfNeeded(
     console.log('Clicking RainbowKit Connect Wallet button');
     await rainbowKitConnectButton.click();
 
-    // Wait for RainbowKit modal to appear
-    await page.waitForTimeout(500);
+    // Wait for RainbowKit modal to appear (longer delay in CI)
+    await page.waitForTimeout(isCI ? 1000 : 500);
 
     // Look for MetaMask option in the RainbowKit modal and click it
     const metamaskOption = page.locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]');
     const isMetaMaskOptionVisible = await metamaskOption
       .first()
-      .isVisible({ timeout: 5000 })
+      .isVisible({ timeout: isCI ? 10000 : 5000 })
       .catch(() => false);
 
     if (isMetaMaskOptionVisible) {
       console.log('Clicking MetaMask option in RainbowKit modal');
       await metamaskOption.first().click();
+
+      // Small delay after clicking to allow MetaMask to start opening
+      if (isCI) {
+        await page.waitForTimeout(500);
+      }
     }
 
     // Wait for MetaMask notification popup to appear
     try {
       await context.waitForEvent('page', {
         predicate: (p: any) => p.url().includes('notification.html'),
-        timeout: 10000,
+        timeout: isCI ? 20000 : 10000,
       });
     } catch {
       // Popup might already exist
+    }
+
+    // Small delay in CI to ensure popup is fully loaded
+    if (isCI) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     // Approve the connection in MetaMask
@@ -395,7 +431,7 @@ export async function connectWalletIfNeeded(
     try {
       await context.waitForEvent('page', {
         predicate: (p: any) => p.url().includes('notification.html'),
-        timeout: 5000,
+        timeout: isCI ? 10000 : 5000,
       });
       await metamask.connectToDapp();
     } catch {
@@ -407,8 +443,8 @@ export async function connectWalletIfNeeded(
   const appPage = await getAppPage(context);
   await appPage.bringToFront();
 
-  // Wait a moment for the UI to update after connection
-  await appPage.waitForTimeout(1000);
+  // Wait a moment for the UI to update after connection (longer in CI)
+  await appPage.waitForTimeout(isCI ? 2000 : 1000);
 
   return appPage;
 }

@@ -45,6 +45,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Worktrunk tool
+ENV PATH="/root/.cargo/bin:${PATH}"
 RUN cargo install cargo --force && cargo install worktrunk && wt config shell install
 
 # Set up workspace directory

@@ -73,7 +73,7 @@ test.describe('Registration Flow', () => {
     await expect(appPage.getByText('Going (spots left)')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show connected account in dropdown', async ({
+  test('should show connected account in RainbowKit button', async ({
     context,
     page,
     metamaskPage,
@@ -102,13 +102,15 @@ test.describe('Registration Flow', () => {
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
 
-    // Wait for account dropdown
-    await appPage.waitForSelector('[role="combobox"]', { timeout: 30000 });
+    // Wait for RainbowKit account button to appear
+    // RainbowKit shows the connected address in a button with data-testid="rk-account-button"
+    // or with the address visible (truncated like "0xf39...266")
+    const accountButton = appPage.locator('[data-testid="rk-account-button"], button:has-text("0x")');
+    await expect(accountButton.first()).toBeVisible({ timeout: 15000 });
 
-    // Verify account address is shown (starts with 0x)
-    const accountDropdown = appPage.getByLabel('Account address');
-    await expect(accountDropdown).toBeVisible({ timeout: 15000 });
-    await expect(accountDropdown).toContainText('0x');
+    // Verify account address format is shown (truncated address starting with 0x)
+    const buttonText = await accountButton.first().textContent();
+    expect(buttonText).toMatch(/0x[a-fA-F0-9]/);
   });
 
   test('should allow user to register for event', async ({

@@ -13,7 +13,9 @@ module.exports = {
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
-  transformIgnorePatterns: ['/node_modules/(?!(ethers|eth-)/)'],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(ethers|eth-|@rainbow-me|wagmi|viem|@wagmi|@tanstack)/)/',
+  ],
   // Longer timeout for integration tests
   testTimeout: 30000,
   // Collect coverage from src components

@@ -97,5 +97,33 @@ global.web3 = {
 // console.error = jest.fn();
 // console.warn = jest.fn();
 
+// Mock RainbowKit ConnectButton (requires provider context in real usage)
+jest.mock('@rainbow-me/rainbowkit', () => ({
+  ConnectButton: () => {
+    const React = require('react');
+    return React.createElement('button', { 'data-testid': 'mock-connect-button' }, 'Connect Wallet');
+  },
+  RainbowKitProvider: ({ children }) => children,
+  getDefaultConfig: jest.fn(() => ({})),
+  lightTheme: jest.fn(() => ({})),
+  darkTheme: jest.fn(() => ({})),
+}));
+
+// Mock wagmi hooks
+jest.mock('wagmi', () => ({
+  WagmiProvider: ({ children }) => children,
+  useAccount: () => ({ address: undefined, isConnected: false }),
+  useChainId: () => 1337,
+  useSwitchChain: () => ({ switchChain: jest.fn() }),
+  useClient: () => null,
+  useConnectorClient: () => ({ data: null }),
+}));
+
+// Mock @tanstack/react-query
+jest.mock('@tanstack/react-query', () => ({
+  QueryClient: jest.fn().mockImplementation(() => ({})),
+  QueryClientProvider: ({ children }) => children,
+}));
+
 // Global test timeout
 jest.setTimeout(30000);

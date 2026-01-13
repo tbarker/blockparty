@@ -59,11 +59,11 @@ describe('FormInput', () => {
       />
     );
 
-    expect(getByText(/Connect via Mist\/Metamask/)).toBeInTheDocument();
+    expect(getByText(/Connect your wallet to register/)).toBeInTheDocument();
   });
 
-  it('shows account selector when accounts are available', async () => {
-    const { getByLabelText } = renderWithProviders(
+  it('shows Connect Wallet button (RainbowKit)', async () => {
+    const { getByTestId } = renderWithProviders(
       <FormInput
         eventEmitter={eventEmitter}
         action={mockAction}
@@ -78,7 +78,8 @@ describe('FormInput', () => {
     await eventEmitter.emitAsync('detail', createMockDetail());
     await waitForAsync();
 
-    expect(getByLabelText(/Account address/)).toBeInTheDocument();
+    // The RainbowKit ConnectButton is mocked in setupTests.js
+    expect(getByTestId('mock-connect-button')).toBeInTheDocument();
   });
 
   it('shows RSVP button when registration is allowed', async () => {

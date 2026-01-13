@@ -2,12 +2,9 @@ import React from 'react';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
 import EditIcon from '@mui/icons-material/Edit';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import participantStatus from '../util/participantStatus';
 import MetadataEditor from './MetadataEditor';
 import { schemas } from '../util/validation';
@@ -97,12 +94,6 @@ class FormInput extends React.Component {
       nameTouched: false,
     });
     this.props.eventEmitter.emit('attendees', []);
-  }
-
-  handleSelect(event) {
-    this.setState({
-      address: event.target.value,
-    });
   }
 
   participantStatus() {
@@ -298,7 +289,7 @@ class FormInput extends React.Component {
 
     var availableSpots = this.state.detail.limitOfParticipants - this.state.detail.registered;
     if (this.props.read_only) {
-      registerButton = <span>Connect via Mist/Metamask to be able to register.</span>;
+      registerButton = <span>Connect your wallet to register.</span>;
     } else if (this.state.accounts.length > 0) {
       if (this.state.detail.ended) {
         registerButton = <span>This event is over </span>;
@@ -363,21 +354,16 @@ class FormInput extends React.Component {
       <Paper elevation={1} sx={{ padding: 2 }}>
         <Box component="form" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
           {nameField}
-          <FormControl sx={{ minWidth: '25em', margin: '0 5px' }} size="small">
-            <InputLabel id="account-select-label">Account address</InputLabel>
-            <Select
-              labelId="account-select-label"
-              value={this.state.address || ''}
-              onChange={this.handleSelect.bind(this)}
-              label="Account address"
-            >
-              {this.state.accounts.map((account, index) => (
-                <MenuItem key={index} value={account}>
-                  {account}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Box sx={{ margin: '0 5px' }}>
+            <ConnectButton
+              chainStatus="icon"
+              showBalance={false}
+              accountStatus={{
+                smallScreen: 'avatar',
+                largeScreen: 'full',
+              }}
+            />
+          </Box>
           {registerButton}
           {withdrawButton}
           {attendButton}

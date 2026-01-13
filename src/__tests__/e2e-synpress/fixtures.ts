@@ -321,80 +321,95 @@ export async function setupMetaMaskNetwork(metamask: MetaMask, context: any): Pr
 }
 
 /**
- * Connect MetaMask to dapp - handles auto-connection popups
- * The BlockParty app auto-requests wallet connection on load,
- * so we need to approve it even without clicking a button
+ * Connect MetaMask to dapp - handles RainbowKit ConnectButton flow
+ * With RainbowKit, clicking the Connect button opens a modal where user selects a wallet.
+ * For MetaMask, this triggers a MetaMask notification popup.
  */
 export async function connectWalletIfNeeded(
   page: any,
   metamask: MetaMask,
   context: any
 ): Promise<any> {
-  // Wait for either wallet connected state OR MetaMask notification popup
-  // instead of fixed 4000ms wait
-  const connectionReady = await Promise.race([
-    // Option 1: App shows connected state (combobox with account)
-    page
-      .locator('[role="combobox"]')
-      .waitFor({ state: 'visible', timeout: 10000 })
-      .then(() => 'connected'),
-    // Option 2: MetaMask notification page appears
-    context
-      .waitForEvent('page', {
-        predicate: (p: any) => p.url().includes('notification.html'),
-        timeout: 10000,
-      })
-      .then(() => 'popup'),
-  ]).catch(() => 'timeout');
+  // First, dismiss any welcome/instruction modal that might be blocking
+  await dismissWelcomeModal(page);
 
-  // Try to connect to dapp - MetaMask may show a popup automatically
-  if (connectionReady !== 'connected') {
-    try {
-      await metamask.connectToDapp();
-    } catch (e) {
-      // Connection may have already been approved or no popup appeared
-      console.log('First connectToDapp attempt:', (e as Error).message);
-    }
+  // Check if already connected - RainbowKit shows account address when connected
+  const isAlreadyConnected = await page
+    .locator('[data-testid="rk-account-button"], button:has-text("0x")')
+    .isVisible({ timeout: 3000 })
+    .catch(() => false);
+
+  if (isAlreadyConnected) {
+    console.log('Wallet already connected');
+    return await getAppPage(context);
   }
 
-  // Check if there's still a MetaMask notification popup
-  const pages = context.pages();
-  const notificationPage = pages.find((p: any) => {
-    const url = p.url();
-    return url.includes('notification') || url.includes('connect');
+  // Look for RainbowKit Connect Wallet button
+  const rainbowKitConnectButton = page.locator('button:has-text("Connect Wallet")');
+
+  // Wait for the button to be visible (may take time after modal dismissal)
+  await rainbowKitConnectButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {
+    console.log('Connect Wallet button not found');
   });
 
-  if (notificationPage) {
+  const isRainbowKitButtonVisible = await rainbowKitConnectButton.isVisible().catch(() => false);
+
+  if (isRainbowKitButtonVisible) {
+    console.log('Clicking RainbowKit Connect Wallet button');
+    await rainbowKitConnectButton.click();
+
+    // Wait for RainbowKit modal to appear
+    await page.waitForTimeout(500);
+
+    // Look for MetaMask option in the RainbowKit modal and click it
+    const metamaskOption = page.locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]');
+    const isMetaMaskOptionVisible = await metamaskOption
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+
+    if (isMetaMaskOptionVisible) {
+      console.log('Clicking MetaMask option in RainbowKit modal');
+      await metamaskOption.first().click();
+    }
+
+    // Wait for MetaMask notification popup to appear
+    try {
+      await context.waitForEvent('page', {
+        predicate: (p: any) => p.url().includes('notification.html'),
+        timeout: 10000,
+      });
+    } catch {
+      // Popup might already exist
+    }
+
+    // Approve the connection in MetaMask
     try {
       await metamask.connectToDapp();
+      console.log('MetaMask connection approved');
     } catch (e) {
-      // Connection may have already been approved
-      console.log('Second connectToDapp attempt:', (e as Error).message);
+      console.log('connectToDapp attempt:', (e as Error).message);
     }
-  }
-
-  // Check for manual connect button on the app page
-  const connectButton = page.locator('button:has-text("Connect")');
-  const isConnectVisible = await connectButton.isVisible({ timeout: 3000 }).catch(() => false);
-
-  if (isConnectVisible) {
-    await connectButton.click();
-
-    // Wait for MetaMask popup to appear after clicking connect
+  } else {
+    // Fallback: Check for MetaMask notification popup (auto-connection scenarios)
     try {
       await context.waitForEvent('page', {
         predicate: (p: any) => p.url().includes('notification.html'),
         timeout: 5000,
       });
       await metamask.connectToDapp();
-    } catch (e) {
-      // Connection may have already been approved
+    } catch {
+      // No popup appeared
     }
   }
 
   // Return the app page (in case focus shifted during connection)
   const appPage = await getAppPage(context);
   await appPage.bringToFront();
+
+  // Wait a moment for the UI to update after connection
+  await appPage.waitForTimeout(1000);
+
   return appPage;
 }
 

@@ -2,7 +2,8 @@
  * Browser-compatible Arweave upload module via ArDrive Turbo
  *
  * This module provides functionality to upload event metadata and images
- * to Arweave using ArDrive Turbo from a browser environment with MetaMask/wallet connection.
+ * to Arweave using ArDrive Turbo from a browser environment.
+ * Supports all RainbowKit wallets (MetaMask, WalletConnect, Coinbase Wallet, Rainbow, etc.).
  *
  * Network behavior:
  * - Mainnet (chainId 1): Uses ArDrive Turbo production services (costs real credits)
@@ -119,6 +120,7 @@ async function loadTurboSDK() {
 /**
  * Create a provider wrapper compatible with InjectedEthereumSigner
  * Handles ethers v6 signer to work with arbundles which expects v5 patterns
+ * Supports both injected wallets (MetaMask) and WalletConnect/Coinbase via RainbowKit
  * @param {Object} ethersSigner - ethers v6 signer from provider.getSigner()
  * @param {string} address - wallet address
  * @returns {Object} Provider wrapper for InjectedEthereumSigner
@@ -129,30 +131,53 @@ function createProviderWrapper(ethersSigner, address) {
       signMessage: async message => {
         console.log('[Arweave] signMessage called, message type:', typeof message);
 
-        // Convert Uint8Array to hex string for personal_sign
+        // Convert Uint8Array to string if needed for ethers signMessage
         // InjectedEthereumSigner may pass string or Uint8Array
         let messageToSign;
         if (typeof message === 'string') {
           messageToSign = message;
-        } else {
+        } else if (message instanceof Uint8Array) {
           // Convert Uint8Array to hex string prefixed with 0x
           messageToSign =
             '0x' +
             Array.from(message)
               .map(b => b.toString(16).padStart(2, '0'))
               .join('');
+        } else {
+          messageToSign = message;
         }
 
-        console.log('[Arweave] Requesting signature via personal_sign...');
+        console.log('[Arweave] Requesting signature...');
 
-        // Use direct ethereum RPC for compatibility
-        const signature = await window.ethereum.request({
-          method: 'personal_sign',
-          params: [messageToSign, address],
-        });
+        // Try using ethers signer first (works with all wallet types via wagmi adapter)
+        // Falls back to window.ethereum for direct MetaMask access
+        try {
+          // For Uint8Array, use signMessage directly with the bytes
+          if (message instanceof Uint8Array) {
+            const signature = await ethersSigner.signMessage(message);
+            console.log('[Arweave] Signature received via ethers signer (bytes)');
+            return signature;
+          }
 
-        console.log('[Arweave] Signature received');
-        return signature;
+          // For string messages
+          const signature = await ethersSigner.signMessage(messageToSign);
+          console.log('[Arweave] Signature received via ethers signer');
+          return signature;
+        } catch (ethersError) {
+          console.log('[Arweave] ethers signer failed, trying window.ethereum fallback:', ethersError.message);
+
+          // Fallback to direct window.ethereum.request for MetaMask compatibility
+          if (typeof window !== 'undefined' && window.ethereum) {
+            const signature = await window.ethereum.request({
+              method: 'personal_sign',
+              params: [messageToSign, address],
+            });
+            console.log('[Arweave] Signature received via window.ethereum fallback');
+            return signature;
+          }
+
+          throw ethersError;
+        }
       },
     }),
   };

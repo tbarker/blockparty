@@ -30,6 +30,7 @@ module.exports = {
       'process.env.CONTRACT_ADDRESS': JSON.stringify(process.env.CONTRACT_ADDRESS),
       'process.env.FACTORY_ADDRESS': JSON.stringify(process.env.FACTORY_ADDRESS),
       'process.env.SEPOLIA_RPC_URL': JSON.stringify(process.env.SEPOLIA_RPC_URL),
+      'process.env.WALLETCONNECT_PROJECT_ID': JSON.stringify(process.env.WALLETCONNECT_PROJECT_ID),
     }),
     // Generate index.html with injected script tags
     new HtmlWebpackPlugin({
@@ -56,19 +57,27 @@ module.exports = {
       vm: false,
     },
     // Alias for process/browser (axios imports without .js extension)
+    // Also mock React Native modules that @metamask/sdk tries to import
     alias: {
       'process/browser': require.resolve('process/browser.js'),
+      // Mock React Native async storage - not needed in browser environment
+      '@react-native-async-storage/async-storage': false,
     },
     // Allow importing without full extension (needed for some ESM modules)
     fullySpecified: false,
     extensions: ['.js', '.jsx', '.json'],
   },
-  // Ignore critical dependency warnings from ethers.js
-  // These are false positives from dynamic require() in minified code
+  // Ignore warnings that don't affect functionality
   ignoreWarnings: [
+    // ethers.js critical dependency warnings are false positives
     {
       module: /node_modules\/ethers/,
       message: /Critical dependency/,
+    },
+    // @metamask/sdk tries to import React Native modules that aren't needed in browser
+    {
+      module: /node_modules\/@metamask\/sdk/,
+      message: /Can't resolve '@react-native-async-storage/,
     },
   ],
   module: {

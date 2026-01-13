@@ -55,13 +55,15 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@ardrive/turbo-sdk": "^1.30.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@ensdomains/ens": "^0.6.2",
     "@ensdomains/resolver": "^0.3.1",
-    "@ardrive/turbo-sdk": "^1.30.0",
     "@mui/icons-material": "^7.0.0",
     "@mui/material": "^7.0.0",
+    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@tanstack/react-query": "^5.90.16",
     "axios": "^1.9.0",
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^7.1.0",
@@ -78,6 +80,8 @@
     "sol-merger": "^4.4.2",
     "style-loader": "^4.0.0",
     "url-loader": "^4.1.1",
+    "viem": "^2.44.2",
+    "wagmi": "^2.19.5",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

@@ -131,94 +131,56 @@ export default class Instruction extends React.Component {
             </Typography>
 
             <Typography variant="h5" gutterBottom>
-              How to setup
+              Connecting Your Wallet
+            </Typography>
+            <Typography paragraph>
+              BlockParty supports multiple wallet options. Click the &quot;Connect Wallet&quot; button
+              to get started.
             </Typography>
 
             <Typography variant="h6" gutterBottom>
-              Option 1: access from mobile browser
-            </Typography>
-            <Typography paragraph>
-              This is the recommended way. The easier step by step guide is{' '}
-              <a href="https://medium.com/@makoto_inoue/participating-blockparty-event-with-a-mobile-wallet-b6b9123246f7">
-                here
-              </a>
+              Supported Wallets
             </Typography>
             <ul>
               <li>
-                Step 1: Download <a href="http://status.im">Status.im</a>,{' '}
-                <a href="https://www.cipherbrowser.com">Cipher Browser</a> or{' '}
-                <a href="https://trustwalletapp.com">Trust Wallet</a> from App store/Google play
+                <strong><a href="https://metamask.io/">MetaMask</a></strong> - The most popular
+                browser extension wallet. Available for Chrome, Firefox, Brave, and Edge.
               </li>
-              <li>Step 2: Create an account on your wallet, and make sure you have some Ether.</li>
-              <li>Step 3: Type the event url on their built in browser</li>
+              <li>
+                <strong><a href="https://rainbow.me/">Rainbow</a></strong> - A fun, simple, and secure
+                Ethereum wallet available as a mobile app.
+              </li>
+              <li>
+                <strong><a href="https://www.coinbase.com/wallet">Coinbase Wallet</a></strong> - A
+                self-custody wallet from Coinbase, available as browser extension and mobile app.
+              </li>
+              <li>
+                <strong>WalletConnect</strong> - Connect any mobile wallet that supports WalletConnect
+                by scanning a QR code. This includes Trust Wallet, Argent, imToken, and many others.
+              </li>
             </ul>
 
             <Typography variant="h6" gutterBottom>
-              Option 2: access from desktop browser with <a href="https://metamask.io/">Metamask</a>{' '}
-              Chrome extension
+              Desktop Setup (Recommended)
             </Typography>
-            <Typography paragraph>This is the most popular way right now.</Typography>
-            <ul>
-              <li>
-                Step 1: Install <a href="https://metamask.io/">Metamask</a> Chrome extension
-              </li>
-              <li>
-                Step 2: Create an account on your metamask, and make sure you have some Ether.
-              </li>
-              <li>Step 3: Refresh the page</li>
-            </ul>
+            <ol>
+              <li>Install your preferred wallet browser extension (MetaMask, Coinbase Wallet, or Rainbow)</li>
+              <li>Create an account and securely store your recovery phrase</li>
+              <li>Add some ETH to your wallet for transaction fees and deposits</li>
+              <li>Click the &quot;Connect Wallet&quot; button on this page</li>
+              <li>Select your wallet and approve the connection</li>
+            </ol>
 
             <Typography variant="h6" gutterBottom>
-              Option 3: access from normal browser connecting to local node
+              Mobile Setup
             </Typography>
-            <Typography paragraph>
-              This has been the standard way to access Dapp prior to Ethereum Wallet (lower than v
-              0.7)
-            </Typography>
-            <ul>
-              <li>
-                Step 1: Install{' '}
-                <a href="https://github.com/ethereum/mist/releases">
-                  Mist browser (v 0.8 or higher)
-                </a>
-                , and make sure you choose <strong>mainnet</strong>. Here is{' '}
-                <a href="https://www.youtube.com/watch?v=Y3JfLgjqNU4">a quick video tutorial</a>
-              </li>
-              <li>Step 2: Create an account on your wallet, and make sure you have some Ether.</li>
-              <li>Step 3: Stop Ethereum Wallet</li>
-              <li>
-                Step 4: Start geth(Go Etheruem, command line tool) with the following options. (See
-                the{' '}
-                <a href="https://github.com/ethereum/go-ethereum/wiki/Building-Ethereum">
-                  installation instructions
-                </a>{' '}
-                for each platform)
-              </li>
-              <li>Step 5: Refresh this page</li>
-            </ul>
-            <Box
-              component="blockquote"
-              sx={{ backgroundColor: 'black', color: 'white', padding: '1em' }}
-            >
-              geth --unlock 0 --rpc --rpcapi &quot;eth,net,web3&quot; --rpccorsdomain URL
-            </Box>
-            <Typography paragraph>
-              NOTE:{' '}
-              <Box
-                component="span"
-                sx={{ backgroundColor: 'black', color: 'white', padding: '0.3em' }}
-              >
-                --unlock 0
-              </Box>{' '}
-              will unlock with one account.{' '}
-              <Box
-                component="span"
-                sx={{ backgroundColor: 'black', color: 'white', padding: '0.3em' }}
-              >
-                --unlock 0 1
-              </Box>{' '}
-              will unlock with two accounts.
-            </Typography>
+            <ol>
+              <li>Download a WalletConnect-compatible wallet (Rainbow, Trust Wallet, MetaMask Mobile, etc.)</li>
+              <li>Create an account and fund it with some ETH</li>
+              <li>Click &quot;Connect Wallet&quot; and select WalletConnect</li>
+              <li>Scan the QR code with your mobile wallet</li>
+              <li>Approve the connection in your wallet app</li>
+            </ol>
 
             <Typography variant="h5" gutterBottom>
               How to play?

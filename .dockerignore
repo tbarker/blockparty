@@ -1,0 +1,12 @@
+# Git submodule directories (empty placeholders - will be initialized via git)
+lib/
+
+# Development
+.devcontainer/
+node_modules/
+coverage/
+test-results/
+
+# Build artifacts
+cache/
+out/

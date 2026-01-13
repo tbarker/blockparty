@@ -32,9 +32,8 @@ RUN npm install
 # Copy the rest of the application
 COPY . .
 
-# Install Forge dependencies (forge-std for testing framework)
-# Remove empty submodule directory first, then install
-RUN rm -rf lib/forge-std && forge install foundry-rs/forge-std --no-git
+# Initialize git submodules (lib/ excluded via .dockerignore, so clone fresh)
+RUN git submodule update --init --recursive
 
 # Build contracts
 RUN forge build

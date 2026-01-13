@@ -64,18 +64,21 @@ async function startAnvil() {
   // Store PID for cleanup
   global.__ANVIL_PID__ = anvil.pid;
 
-  // Wait for Anvil to be ready
+  // Wait for Anvil to be ready with exponential backoff
+  // Optimized: Anvil typically starts in <500ms, so use faster polling
   let attempts = 0;
-  while (attempts < 30) {
+  while (attempts < 20) {
     if (await isAnvilRunning()) {
       console.log('[E2E Setup] Anvil is ready');
       return anvil;
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Faster backoff: 50ms, 75ms, 112ms, ... up to 300ms max
+    const delay = Math.min(50 * Math.pow(1.5, attempts), 300);
+    await new Promise(resolve => setTimeout(resolve, delay));
     attempts++;
   }
 
-  throw new Error('Anvil failed to start within 15 seconds');
+  throw new Error('Anvil failed to start within timeout');
 }
 
 /**

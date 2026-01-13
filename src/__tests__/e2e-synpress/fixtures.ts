@@ -81,7 +81,8 @@ export async function waitForMetaMaskAndConfirm(
   context: any,
   options?: { timeout?: number }
 ): Promise<void> {
-  const timeout = options?.timeout || 30000;
+  // Reduced from 30s to 5s - on Anvil, MetaMask popups appear in <2s
+  const timeout = options?.timeout || 5000;
 
   // Wait for a MetaMask notification page to appear
   // Synpress's confirmTransaction() has internal retries, but we want to ensure
@@ -214,9 +215,9 @@ export async function waitForAppLoad(page: any): Promise<void> {
     });
 
   // Dismiss the welcome modal if it appears (shows after React mounts via requestAnimationFrame)
-  // Call it early in case modal blocks the Event Info header
   await dismissWelcomeModal(page);
 
+  // Wait for Event Info header
   await page.waitForSelector('h4:has-text("Event Info")', { timeout: 60000 });
 
   // Wait for dynamic content to be populated instead of arbitrary timeout
@@ -228,10 +229,6 @@ export async function waitForAppLoad(page: any): Promise<void> {
     .catch(() => {
       // Content might already be visible or in a different format
     });
-
-  // Final modal check - the modal might have appeared during content loading
-  // (e.g., triggered by ConferenceDetail 5-second timeout if data was slow)
-  await dismissWelcomeModal(page);
 }
 
 /**
@@ -403,40 +400,75 @@ export async function switchAccount(metamask: MetaMask, accountName: string): Pr
 /**
  * All Anvil pre-funded accounts (from seed phrase: "test test test test test test test test test test test junk")
  * Each account has 10000 ETH on Anvil.
+ * MetaMask names match the wallet-setup: "Account 1" (default), "User2", "Admin3", etc.
  */
 export const ALL_ANVIL_ACCOUNTS = [
   { address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', privateKey: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', metamaskName: 'Account 1' },
-  { address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', privateKey: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d', metamaskName: 'Account 2' },
-  { address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', privateKey: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a', metamaskName: 'Account 3' },
-  { address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', privateKey: '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6', metamaskName: 'Account 4' },
-  { address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', privateKey: '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a', metamaskName: 'Account 5' },
-  { address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', privateKey: '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba', metamaskName: 'Account 6' },
-  { address: '0x976EA74026E726554dB657fA54763abd0C3a0aa9', privateKey: '0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e', metamaskName: 'Account 7' },
-  { address: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955', privateKey: '0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356', metamaskName: 'Account 8' },
-  { address: '0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f', privateKey: '0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97', metamaskName: 'Account 9' },
-  { address: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720', privateKey: '0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6', metamaskName: 'Account 10' },
+  { address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', privateKey: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d', metamaskName: 'User2' },
+  { address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', privateKey: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a', metamaskName: 'Admin3' },
+  { address: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', privateKey: '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6', metamaskName: 'User4' },
+  { address: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', privateKey: '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a', metamaskName: 'Admin5' },
+  { address: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', privateKey: '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba', metamaskName: 'User6' },
+  { address: '0x976EA74026E726554dB657fA54763abd0C3a0aa9', privateKey: '0x92db14e403b83dfe3df233f83dfa3a0d7096f21ca9b0d6d6b8d88b2b4ec1564e', metamaskName: 'Admin7' },
+  { address: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955', privateKey: '0x4bbbf85ce3377467afe5d46f804f221813b2bb87f24d81f60f1fcdbf7cbf4356', metamaskName: 'User8' },
+  { address: '0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f', privateKey: '0xdbda1821b80551c9d65939329250298aa3472ba22feea921c0cf5d620ea67b97', metamaskName: 'Admin9' },
+  { address: '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720', privateKey: '0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6', metamaskName: 'User10' },
 ] as const;
 
 /**
- * Suite-specific account assignments for test execution.
- * All suites use Account 1 (deployer/admin) and User2 (user).
- * Tests run sequentially (workers: 1) to avoid nonce conflicts.
+ * Get accounts for a test based on its parallel worker index.
+ * Each worker gets a dedicated pair of accounts to prevent nonce conflicts.
+ *
+ * With 4 workers and 10 accounts:
+ * - Worker 0: accounts 0,1 (Account 1, User2)
+ * - Worker 1: accounts 2,3 (Admin3, User4)
+ * - Worker 2: accounts 4,5 (Admin5, User6)
+ * - Worker 3: accounts 6,7 (Admin7, User8)
+ *
+ * This ensures no two workers can use the same account simultaneously,
+ * preventing nonce conflicts when deploying contracts in parallel.
+ *
+ * @param parallelIndex - The worker index from test.info().parallelIndex
+ * @returns Object with admin and user accounts for this worker
+ */
+export function getWorkerAccounts(parallelIndex: number) {
+  // With 4 workers and 10 accounts, each worker gets 2 dedicated accounts
+  // Use modulo to handle cases with more workers than pairs
+  const pairIndex = parallelIndex % 5;
+  const adminIndex = pairIndex * 2;
+  const userIndex = pairIndex * 2 + 1;
+
+  return {
+    admin: ALL_ANVIL_ACCOUNTS[adminIndex],
+    user: ALL_ANVIL_ACCOUNTS[userIndex],
+    // deployer is same as admin for most tests
+    deployer: ALL_ANVIL_ACCOUNTS[adminIndex],
+  };
+}
+
+/**
+ * Suite-specific account assignments for parallel test execution.
+ * Each suite gets dedicated accounts to avoid nonce conflicts when running in parallel.
+ *
+ * NOTE: With fullyParallel: true, tests may run on any worker with any MetaMask instance.
+ * Each worker has its own MetaMask, so the same account names can be used safely.
+ * These assignments provide consistent defaults for tests that use them.
  */
 export const SUITE_ACCOUNTS = {
   createEvent: {
-    deployer: { ...ALL_ANVIL_ACCOUNTS[0], metamaskName: 'Account 1' },
+    deployer: ALL_ANVIL_ACCOUNTS[0], // Account 1
   },
   registration: {
-    deployer: { ...ALL_ANVIL_ACCOUNTS[0], metamaskName: 'Account 1' },
-    user: { ...ALL_ANVIL_ACCOUNTS[1], metamaskName: 'User2' },
+    deployer: ALL_ANVIL_ACCOUNTS[2], // Admin3
+    user: ALL_ANVIL_ACCOUNTS[3],     // User4
   },
   attendance: {
-    admin: { ...ALL_ANVIL_ACCOUNTS[0], metamaskName: 'Account 1' },
-    user: { ...ALL_ANVIL_ACCOUNTS[1], metamaskName: 'User2' },
+    admin: ALL_ANVIL_ACCOUNTS[4],    // Admin5
+    user: ALL_ANVIL_ACCOUNTS[5],     // User6
   },
   withdrawal: {
-    admin: { ...ALL_ANVIL_ACCOUNTS[0], metamaskName: 'Account 1' },
-    user: { ...ALL_ANVIL_ACCOUNTS[1], metamaskName: 'User2' },
+    admin: ALL_ANVIL_ACCOUNTS[6],    // Admin7
+    user: ALL_ANVIL_ACCOUNTS[7],     // User8
   },
 } as const;
 

@@ -7,8 +7,8 @@
  * 3. Admin triggers payback
  * 4. User withdraws their payout
  *
- * PARALLELIZATION: This suite deploys its own contract and uses dedicated accounts
- * (Account 6 as admin, Account 7 as user) to avoid conflicts with other test suites.
+ * PARALLELIZATION: Each test deploys its own contract for full isolation.
+ * Tests run fully parallel with workers = CPU cores (max 5).
  */
 
 import {
@@ -25,32 +25,27 @@ import {
   injectE2EConfigWithContract,
   setupMetaMaskNetwork,
   deployTestEvent,
-  SUITE_ACCOUNTS,
+  getWorkerAccounts,
 } from './fixtures';
 
-// Suite-specific contract address (deployed in beforeAll)
-let suiteContractAddress: string;
-
-// Use dedicated accounts for this suite
-const ACCOUNTS = SUITE_ACCOUNTS.withdrawal;
-
 test.describe('Withdrawal Flow', () => {
-  // Deploy a fresh contract for this suite
-  test.beforeAll(async () => {
-    suiteContractAddress = await deployTestEvent({
-      name: 'Withdrawal Test Event',
-      deposit: '0.02',
-      maxParticipants: 20,
-      deployerPrivateKey: ACCOUNTS.admin.privateKey,
-    });
-  });
-
   test('should allow user to withdraw after attendance and payback', async ({
     context,
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Withdrawal Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -59,23 +54,22 @@ test.describe('Withdrawal Flow', () => {
     // Step 1: Register as user (suite-specific user account)
     await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    if (await canUserRegister(appPage)) {
-      const handle = `@withdraw_${Date.now()}`;
-      const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-      await twitterInput.fill(handle);
-      await appPage.locator('button:has-text("RSVP")').click();
+    // Register
+    const handle = `@withdraw_${Date.now()}`;
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill(handle);
+    await appPage.locator('button:has-text("RSVP")').click();
 
-      await waitForMetaMaskAndConfirm(metamask, context);
-      await waitForTransactionSuccess(appPage);
-    }
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionSuccess(appPage);
 
     // Step 2: Switch to admin (suite-specific admin account)
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
@@ -126,7 +120,18 @@ test.describe('Withdrawal Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Withdraw Button Visibility Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -134,22 +139,21 @@ test.describe('Withdrawal Flow', () => {
 
     await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    if (await canUserRegister(appPage)) {
-      const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-      await twitterInput.fill('@withdraw_visible');
-      await appPage.locator('button:has-text("RSVP")').click();
+    // Register
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill('@withdraw_visible');
+    await appPage.locator('button:has-text("RSVP")').click();
 
-      await waitForMetaMaskAndConfirm(metamask, context);
-      await waitForTransactionSuccess(appPage);
-    }
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionSuccess(appPage);
 
     const withdrawButton = appPage.locator('button:has-text("Withdraw")');
     const rsvpButton = appPage.locator('button:has-text("RSVP")');
@@ -163,19 +167,73 @@ test.describe('Withdrawal Flow', () => {
     }
   });
 
-  test('should prevent double withdrawal', async ({ context, page, metamaskPage, extensionId }) => {
+  test('should prevent double withdrawal', async ({ context, page, metamaskPage, extensionId }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Double Withdrawal Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
+    // Step 1: Register as user
     await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await waitForAppLoad(appPage);
+
+    // Register
+    const handle = `@double_${Date.now()}`;
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill(handle);
+    await appPage.locator('button:has-text("RSVP")').click();
+
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionSuccess(appPage);
+
+    // Step 2: Switch to admin and mark attendance
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
+    await appPage.reload();
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await waitForAppLoad(appPage);
+
+    // Mark attendance if checkbox available
+    const attendCheckbox = appPage.locator('input[type="checkbox"]').first();
+    if ((await attendCheckbox.count()) > 0 && !(await attendCheckbox.isChecked())) {
+      await attendCheckbox.check();
+
+      const attendButton = appPage.locator('button:has-text("Attend")');
+      if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
+        await attendButton.click();
+        await waitForMetaMaskAndConfirm(metamask, context);
+        await waitForTransactionSuccess(appPage);
+      }
+    }
+
+    // Step 3: Trigger payback
+    const paybackButton = appPage.locator('button:has-text("Payback")');
+    if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
+      await paybackButton.click();
+      await waitForMetaMaskAndConfirm(metamask, context);
+      await waitForTransactionSuccess(appPage);
+    }
+
+    // Step 4: Switch back to user and withdraw
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
+    await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
@@ -187,7 +245,7 @@ test.describe('Withdrawal Flow', () => {
       // Wait for withdrawal to complete and button state to update
       await waitForTransactionComplete(appPage);
 
-      // After withdrawal, button should be disabled or gone
+      // Step 5: Verify can't withdraw again - button should be disabled or gone
       const isDisabled = await withdrawButton.isDisabled().catch(() => true);
       const buttonCount = await withdrawButton.count();
 

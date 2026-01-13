@@ -211,6 +211,65 @@ npm run test:e2e
 
 ---
 
+## Parallelization
+
+### Configuration
+
+Tests run fully parallel with worker count automatically set to CPU cores (capped at 5):
+
+```typescript
+const cpuCount = os.cpus().length;
+const maxWorkers = Math.min(cpuCount, 5);
+```
+
+### Account Isolation
+
+Each worker gets a dedicated pair of accounts to prevent nonce conflicts:
+
+```typescript
+function getWorkerAccounts(parallelIndex: number) {
+  const pairIndex = parallelIndex % 5;
+  const adminIndex = pairIndex * 2;
+  const userIndex = pairIndex * 2 + 1;
+  return {
+    admin: ALL_ANVIL_ACCOUNTS[adminIndex],
+    user: ALL_ANVIL_ACCOUNTS[userIndex],
+    deployer: ALL_ANVIL_ACCOUNTS[adminIndex],
+  };
+}
+```
+
+Worker to account mapping:
+- Worker 0: Account 1 (admin), User2 (user)
+- Worker 1: Admin3 (admin), User4 (user)
+- Worker 2: Admin5 (admin), User6 (user)
+- Worker 3: Admin7 (admin), User8 (user)
+- Worker 4: Admin9 (admin), User10 (user)
+
+### Test Pattern
+
+Each test uses `testInfo.parallelIndex` to get isolated accounts:
+
+```typescript
+test('example', async ({ context, ... }, testInfo) => {
+  const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+  const contractAddress = await deployTestEvent({
+    deployerPrivateKey: ACCOUNTS.admin.privateKey,
+  });
+  // ...
+});
+```
+
+### Contract Isolation
+
+Each test deploys its own Conference contract via `deployTestEvent()`, ensuring:
+- No shared contract state between tests
+- Full isolation even when running in parallel
+- Independent event lifecycle per test
+
+---
+
 ## References
 
 - Synpress docs: https://docs.synpress.io

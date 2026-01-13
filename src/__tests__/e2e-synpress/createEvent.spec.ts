@@ -9,6 +9,9 @@
  * 5. Event is created via ConferenceFactory
  * 6. User can navigate to the newly created event
  * 7. Metadata is fetched from Arweave and displayed
+ *
+ * PARALLELIZATION: Tests are independent and use the factory to create new events.
+ * Each test runs in isolation with workers = CPU cores (max 5).
  */
 
 import path from 'path';
@@ -24,6 +27,8 @@ import {
   setupMetaMaskNetwork,
   dismissWelcomeModal,
   waitForAppLoad,
+  switchAccount,
+  getWorkerAccounts,
 } from './fixtures';
 
 test.describe('Create Event Flow', () => {
@@ -130,8 +135,8 @@ test.describe('Create Event Flow', () => {
       )
       .catch(() => {});
 
-    // Modal appears via requestAnimationFrame after React renders
-    await appPage.waitForTimeout(500);
+    // Wait for modal to appear (renders via requestAnimationFrame after React)
+    await appPage.locator('.MuiDialog-root').waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
     await dismissWelcomeModal(appPage);
 
     // Verify landing page shows "Create New Event" button (wait for it instead of arbitrary timeout)
@@ -139,16 +144,23 @@ test.describe('Create Event Flow', () => {
     await expect(createButton).toBeVisible({ timeout: 15000 });
   });
 
+  // This test creates an event via factory (no Arweave upload)
   test('should create event via factory and navigate to it', async ({
     context,
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts and ensure ETH balance
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
+
+    // Switch to admin account (has ETH from Anvil)
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
     // Inject E2E config without contract address (factory only)
     await injectE2EConfigFactoryOnly(appPage);
@@ -399,16 +411,26 @@ test.describe('Create Event Flow', () => {
     await expect(uploadButton).toBeVisible({ timeout: 5000 });
   });
 
+  // This test involves image upload + Arweave + contract creation
   test('should create event via factory and verify on event page', async ({
     context,
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Triple the default timeout for Arweave upload + signature operations
+    test.slow();
+
+    // Get accounts for this worker to prevent nonce conflicts and ensure ETH balance
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
+
+    // Switch to admin account (has ETH from Anvil)
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
     // Inject E2E config without contract address (factory only)
     await injectE2EConfigFactoryOnly(appPage);
@@ -429,8 +451,8 @@ test.describe('Create Event Flow', () => {
       )
       .catch(() => {});
 
-    // Modal appears via requestAnimationFrame after React renders, so wait a moment
-    await appPage.waitForTimeout(500);
+    // Wait for modal to appear (renders via requestAnimationFrame after React)
+    await appPage.locator('.MuiDialog-root').waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
     await dismissWelcomeModal(appPage);
 
     // Click "+ New Event" button in AppBar (wait for it instead of arbitrary timeout)
@@ -502,7 +524,14 @@ test.describe('Create Event Flow', () => {
     // Scroll to top first to verify all fields, then to bottom for button
     const dialogContent = appPage.locator('[role="dialog"]');
     await dialogContent.evaluate(el => el.scrollTo(0, 0));
-    await appPage.waitForTimeout(300);
+    // Wait for scroll to complete instead of fixed delay
+    await appPage.waitForFunction(
+      () => {
+        const dialog = document.querySelector('[role="dialog"]');
+        return dialog && dialog.scrollTop === 0;
+      },
+      { timeout: 1000 }
+    ).catch(() => {});
 
     // Take a screenshot to debug form state
     await appPage.screenshot({ path: 'test-results/form-before-submit.png' });
@@ -561,8 +590,8 @@ test.describe('Create Event Flow', () => {
           // Not creating anymore, check for success
           break;
         }
-        // Small delay before next check
-        await appPage.waitForTimeout(500);
+        // Short delay before next check (outer loop handles overall timeout)
+        await appPage.waitForTimeout(200);
         console.log('No MetaMask popup found, continuing...');
       }
     }

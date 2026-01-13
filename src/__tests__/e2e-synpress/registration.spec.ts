@@ -9,8 +9,8 @@
  * 5. Transaction is mined on Anvil
  * 6. UI updates to show registration status
  *
- * PARALLELIZATION: This suite deploys its own contract and uses dedicated accounts
- * (Account 2 as deployer) to avoid conflicts with other test suites.
+ * PARALLELIZATION: Each test deploys its own contract for full isolation.
+ * Tests run fully parallel with workers = CPU cores (max 5).
  */
 
 import {
@@ -23,42 +23,38 @@ import {
   waitForAppLoad,
   canUserRegister,
   connectWalletIfNeeded,
+  switchAccount,
   injectE2EConfigWithContract,
   setupMetaMaskNetwork,
   deployTestEvent,
-  SUITE_ACCOUNTS,
+  getWorkerAccounts,
 } from './fixtures';
 
-// Suite-specific contract address (deployed in beforeAll)
-let suiteContractAddress: string;
-
-// Use dedicated accounts for this suite
-const ACCOUNTS = SUITE_ACCOUNTS.registration;
-
 test.describe('Registration Flow', () => {
-  // Deploy a fresh contract for this suite
-  test.beforeAll(async () => {
-    suiteContractAddress = await deployTestEvent({
-      name: 'Registration Test Event',
-      deposit: '0.02',
-      maxParticipants: 20,
-      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
-    });
-  });
-
   test('should display event details on page load', async ({
     context,
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Registration Details Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first (uses Account 1 which is the default)
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet and get updated app page reference
@@ -82,14 +78,25 @@ test.describe('Registration Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Account Dropdown Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first (uses Account 1 which is the default)
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -109,25 +116,33 @@ test.describe('Registration Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Registration Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Switch to user account for registration
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
+
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
-
-    // Check if user can register
-    if (!(await canUserRegister(appPage))) {
-      console.log('User already registered, skipping test');
-      return;
-    }
 
     // Enter Twitter handle
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
@@ -156,25 +171,33 @@ test.describe('Registration Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Participant Count Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Switch to user account for registration
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
+
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
-
-    if (!(await canUserRegister(appPage))) {
-      // User already registered, verify count is shown
-      await expect(appPage.locator('text=/\\d+\\(\\d+\\)/')).toBeVisible({ timeout: 5000 });
-      return;
-    }
 
     // Register
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
@@ -196,32 +219,44 @@ test.describe('Registration Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Participants Table Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.deployer.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Switch to user account for registration
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
+
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    if (await canUserRegister(appPage)) {
-      // Register a user
-      const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-      await twitterInput.fill('@table_test');
-      await appPage.locator('button:has-text("RSVP")').click();
+    // Register a user
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill('@table_test');
+    await appPage.locator('button:has-text("RSVP")').click();
 
-      // Confirm transaction and wait for table to update
-      await waitForMetaMaskAndConfirm(metamask, context);
-      await waitForTransactionComplete(appPage, {
-        expectElement: 'table',
-      });
-    }
+    // Confirm transaction and wait for table to update
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionComplete(appPage, {
+      expectElement: 'table',
+    });
 
     // Verify participants table
     await expect(appPage.locator('table')).toBeVisible({ timeout: 10000 });

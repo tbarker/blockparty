@@ -7,8 +7,8 @@
  * 3. Admin triggers payback calculation
  * 4. Admin cancels event (if needed)
  *
- * PARALLELIZATION: This suite deploys its own contract and uses dedicated accounts
- * (Account 4 as admin, Account 5 as user) to avoid conflicts with other test suites.
+ * PARALLELIZATION: Each test deploys its own contract for full isolation.
+ * Tests run fully parallel with workers = CPU cores (max 5).
  */
 
 import {
@@ -25,32 +25,27 @@ import {
   injectE2EConfigWithContract,
   setupMetaMaskNetwork,
   deployTestEvent,
-  SUITE_ACCOUNTS,
+  getWorkerAccounts,
 } from './fixtures';
 
-// Suite-specific contract address (deployed in beforeAll)
-let suiteContractAddress: string;
-
-// Use dedicated accounts for this suite
-const ACCOUNTS = SUITE_ACCOUNTS.attendance;
-
 test.describe('Admin Attendance Flow', () => {
-  // Deploy a fresh contract for this suite
-  test.beforeAll(async () => {
-    suiteContractAddress = await deployTestEvent({
-      name: 'Attendance Test Event',
-      deposit: '0.02',
-      maxParticipants: 20,
-      deployerPrivateKey: ACCOUNTS.admin.privateKey,
-    });
-  });
-
   test('should show admin controls when connected as owner', async ({
     context,
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Admin Controls Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -59,18 +54,27 @@ test.describe('Admin Attendance Flow', () => {
     // Use suite-specific admin account (deployer/owner)
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet and reload to ensure correct account is recognized
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    // Reload immediately to ensure admin account is recognized (skip first waitForAppLoad)
+    await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    // Admin controls should be visible
+    // Admin controls should be visible - wait for them to appear
     const cancelButton = appPage.locator('button:has-text("Cancel")');
     const paybackButton = appPage.locator('button:has-text("Payback")');
     const grantAdminButton = appPage.locator('button:has-text("Grant admin")');
+
+    // Wait for at least one admin control to appear (30s timeout)
+    await appPage
+      .locator('button:has-text("Cancel"), button:has-text("Payback"), button:has-text("Grant admin")')
+      .first()
+      .waitFor({ state: 'visible', timeout: 30000 });
 
     const hasCancelButton = (await cancelButton.count()) > 0;
     const hasPaybackButton = (await paybackButton.count()) > 0;
@@ -84,7 +88,18 @@ test.describe('Admin Attendance Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Mark Attendance Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -93,23 +108,22 @@ test.describe('Admin Attendance Flow', () => {
     // First register as user (suite-specific user account)
     await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    if (await canUserRegister(appPage)) {
-      const handle = `@attend_${Date.now()}`;
-      const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-      await twitterInput.fill(handle);
-      await appPage.locator('button:has-text("RSVP")').click();
+    // Register a user
+    const handle = `@attend_${Date.now()}`;
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill(handle);
+    await appPage.locator('button:has-text("RSVP")').click();
 
-      await waitForMetaMaskAndConfirm(metamask, context);
-      await waitForTransactionComplete(appPage);
-    }
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionComplete(appPage);
 
     // Switch to admin (suite-specific admin account)
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
@@ -145,22 +159,63 @@ test.describe('Admin Attendance Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Trigger Payback Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
     let appPage = await setupMetaMaskNetwork(metamask, context);
 
-    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
+    // First register as user
+    await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
+    // Register a participant
+    const handle = `@payback_${Date.now()}`;
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill(handle);
+    await appPage.locator('button:has-text("RSVP")').click();
+
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionComplete(appPage);
+
+    // Switch to admin and mark attendance
+    await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
+    await appPage.reload();
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await waitForAppLoad(appPage);
+
+    // Mark attendance if there are unchecked participants
+    const attendCheckbox = appPage.locator('input[type="checkbox"]').first();
+    if ((await attendCheckbox.count()) > 0 && !(await attendCheckbox.isChecked())) {
+      await attendCheckbox.check();
+
+      const attendButton = appPage.locator('button:has-text("Attend")');
+      if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
+        await attendButton.click();
+        await waitForMetaMaskAndConfirm(metamask, context);
+        await waitForTransactionSuccess(appPage);
+      }
+    }
+
+    // Now trigger payback
     const paybackButton = appPage.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
@@ -176,7 +231,18 @@ test.describe('Admin Attendance Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Cancel Event Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -184,8 +250,8 @@ test.describe('Admin Attendance Flow', () => {
 
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -197,7 +263,7 @@ test.describe('Admin Attendance Flow', () => {
       const isEnabled = await cancelButton.isEnabled();
       if (isEnabled) {
         await expect(cancelButton).toBeEnabled();
-        // Don't actually cancel - would break other tests
+        // Don't actually cancel - just verify button is accessible
       }
     }
   });
@@ -207,7 +273,18 @@ test.describe('Admin Attendance Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Non-Owner Controls Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -215,8 +292,8 @@ test.describe('Admin Attendance Flow', () => {
 
     await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -240,7 +317,18 @@ test.describe('Admin Attendance Flow', () => {
     page,
     metamaskPage,
     extensionId,
-  }) => {
+  }, testInfo) => {
+    // Get accounts for this worker to prevent nonce conflicts
+    const ACCOUNTS = getWorkerAccounts(testInfo.parallelIndex);
+
+    // Deploy isolated contract for this test
+    const contractAddress = await deployTestEvent({
+      name: 'Attended Count Test',
+      deposit: '0.02',
+      maxParticipants: 20,
+      deployerPrivateKey: ACCOUNTS.admin.privateKey,
+    });
+
     const metamask = createMetaMask(context, metamaskPage, extensionId);
 
     // Setup MetaMask network first
@@ -249,22 +337,21 @@ test.describe('Admin Attendance Flow', () => {
     // Register as user first (suite-specific user account)
     await switchAccount(metamask, ACCOUNTS.user.metamaskName);
 
-    // Inject E2E config with suite-specific contract
-    await injectE2EConfigWithContract(appPage, suiteContractAddress);
+    // Inject E2E config with test-specific contract
+    await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
-    if (await canUserRegister(appPage)) {
-      const twitterInput = appPage.locator('input[placeholder*="twitter"]');
-      await twitterInput.fill(`@count_${Date.now()}`);
-      await appPage.locator('button:has-text("RSVP")').click();
+    // Register a user
+    const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.fill(`@count_${Date.now()}`);
+    await appPage.locator('button:has-text("RSVP")').click();
 
-      await waitForMetaMaskAndConfirm(metamask, context);
-      await waitForTransactionSuccess(appPage);
-    }
+    await waitForMetaMaskAndConfirm(metamask, context);
+    await waitForTransactionSuccess(appPage);
 
     // Switch to admin and mark attendance (suite-specific admin account)
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);

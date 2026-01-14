@@ -110,6 +110,22 @@ export const validators = {
   },
 
   /**
+   * Validate that a date is in the future
+   * @param {string} value - Date value to validate
+   * @param {object} options - { fieldName }
+   * @returns {string|null} Error message or null
+   */
+  dateFuture: (value, { fieldName = 'Date' } = {}) => {
+    if (!value) return null;
+    const date = new Date(value);
+    const now = new Date();
+    if (date <= now) {
+      return `${fieldName} must be in the future`;
+    }
+    return null;
+  },
+
+  /**
    * Validate that end date is after start date
    * @param {string} endDate - End date value
    * @param {string} startDate - Start date value to compare against
@@ -122,6 +138,20 @@ export const validators = {
     const start = new Date(startDate);
     if (end <= start) {
       return `${fieldName} must be after start date`;
+    }
+    return null;
+  },
+
+  /**
+   * Validate that end date has a corresponding start date
+   * @param {string} endDate - End date value
+   * @param {string} startDate - Start date value
+   * @param {object} options - { fieldName }
+   * @returns {string|null} Error message or null
+   */
+  dateRequiresStart: (endDate, startDate, { fieldName = 'End date' } = {}) => {
+    if (endDate && !startDate) {
+      return `Start date is required when ${fieldName.toLowerCase()} is set`;
     }
     return null;
   },

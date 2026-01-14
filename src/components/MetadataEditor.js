@@ -157,9 +157,16 @@ class MetadataEditor extends Component {
       return validator(value);
     }
 
-    // Special validation for endDate (must be after start date)
-    if (field === 'endDate' && value && this.state.date) {
-      return validators.dateAfter(value, this.state.date, { fieldName: 'End date' });
+    // Special validation for endDate
+    if (field === 'endDate') {
+      // Check if end date requires start date
+      const requiresStartError = validators.dateRequiresStart(value, this.state.date, { fieldName: 'End date' });
+      if (requiresStartError) return requiresStartError;
+
+      // Check if end date is after start date
+      if (value && this.state.date) {
+        return validators.dateAfter(value, this.state.date, { fieldName: 'End date' });
+      }
     }
 
     return null;
@@ -274,10 +281,16 @@ class MetadataEditor extends Component {
     const twitterUrlError = validators.url(twitterUrl, { fieldName: 'Twitter URL', allowEmpty: true });
     if (twitterUrlError) errors.twitterUrl = twitterUrlError;
 
-    // Validate date range
-    if (date && endDate) {
-      const dateError = validators.dateAfter(endDate, date, { fieldName: 'End date' });
-      if (dateError) errors.endDate = dateError;
+    // Validate end date requires start date
+    const requiresStartError = validators.dateRequiresStart(endDate, date, { fieldName: 'End date' });
+    if (requiresStartError) {
+      errors.endDate = requiresStartError;
+    }
+
+    // Validate end date is after start date
+    if (date && endDate && !errors.endDate) {
+      const dateAfterError = validators.dateAfter(endDate, date, { fieldName: 'End date' });
+      if (dateAfterError) errors.endDate = dateAfterError;
     }
 
     // Mark all validated fields as touched

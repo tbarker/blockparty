@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import MetadataEditor from '../../components/MetadataEditor';
 
@@ -163,5 +163,109 @@ describe('MetadataEditor', () => {
 
     expect(screen.getByLabelText('Start Date/Time')).toBeInTheDocument();
     expect(screen.getByLabelText('End Date/Time')).toBeInTheDocument();
+  });
+
+  describe('Date validation', () => {
+    // Helper to render and wait for async state updates
+    async function renderAndWait(props = {}) {
+      let result;
+      await act(async () => {
+        result = render(<MetadataEditor {...defaultProps} {...props} />);
+        // Wait for isUploadAvailable to resolve
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+      return result;
+    }
+
+    it('shows validation error when end date is before start date', async () => {
+      await renderAndWait();
+
+      // Set dates - end date before start date
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const startDate = '2024-06-15T14:00';
+      const endDate = '2024-06-14T14:00'; // Before start
+
+      await act(async () => {
+        fireEvent.change(dateInputs[0], { target: { value: startDate } });
+        fireEvent.change(dateInputs[1], { target: { value: endDate } });
+      });
+
+      const submitButton = screen.getByText('Save & Upload to Arweave');
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+
+      await waitFor(() => {
+        // Error appears in Alert
+        expect(screen.getByRole('alert')).toHaveTextContent('End date must be after start date');
+      });
+    });
+
+    it('shows validation error when end date is set without start date', async () => {
+      await renderAndWait({ metadata: {} });
+
+      // Set only end date - ensure start date is empty by explicitly clearing it
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const endDate = '2024-06-15T14:00';
+
+      await act(async () => {
+        // Explicitly clear start date to ensure it's empty
+        fireEvent.change(dateInputs[0], { target: { value: '' } });
+        fireEvent.change(dateInputs[1], { target: { value: endDate } });
+      });
+
+      const submitButton = screen.getByText('Save & Upload to Arweave');
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+
+      await waitFor(() => {
+        // Error appears in Alert
+        expect(screen.getByRole('alert')).toHaveTextContent('Start date is required when end date is set');
+      });
+    });
+
+    it('allows dates in the past for editing existing events', async () => {
+      // MetadataEditor allows past dates since we're editing existing events
+      const pastMetadata = {
+        ...mockMetadata,
+        date: '2020-01-15T14:00:00Z',
+        endDate: '2020-01-15T18:00:00Z',
+      };
+
+      const { uploadEventMetadata } = require('../../util/arweaveUpload');
+      uploadEventMetadata.mockResolvedValue('ar://newUri');
+
+      await renderAndWait({ metadata: pastMetadata, onUpdateContract: jest.fn().mockResolvedValue() });
+
+      const submitButton = screen.getByText('Save & Upload to Arweave');
+      await act(async () => {
+        fireEvent.click(submitButton);
+      });
+
+      // Should not show any date-related errors
+      await waitFor(() => {
+        expect(screen.queryByText(/must be in the future/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows field-level error on blur when end date is set without start date', async () => {
+      await renderAndWait({ metadata: {} });
+
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const endDate = '2024-06-15T14:00';
+
+      await act(async () => {
+        // Explicitly clear start date to ensure it's empty
+        fireEvent.change(dateInputs[0], { target: { value: '' } });
+        fireEvent.change(dateInputs[1], { target: { value: endDate } });
+        fireEvent.blur(dateInputs[1]);
+      });
+
+      await waitFor(() => {
+        // Error appears in helper text under the end date field
+        expect(screen.getByText('Start date is required when end date is set')).toBeInTheDocument();
+      });
+    });
   });
 });

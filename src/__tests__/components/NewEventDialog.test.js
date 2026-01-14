@@ -372,6 +372,163 @@ describe('NewEventDialog', () => {
     expect(screen.getByText('Banner Image')).toBeInTheDocument();
   });
 
+  describe('Date validation', () => {
+    it('shows validation error when start date is in the past', async () => {
+      await renderAndWait();
+
+      // Fill in name
+      const textboxes = screen.getAllByRole('textbox');
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+      });
+
+      // Set past start date - find the datetime-local input
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const pastDate = '2020-01-01T12:00';
+      await act(async () => {
+        fireEvent.change(dateInputs[0], { target: { value: pastDate } });
+      });
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        const errors = screen.getAllByText('Start date must be in the future');
+        expect(errors.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('shows validation error when end date is before start date', async () => {
+      await renderAndWait();
+
+      // Fill in name
+      const textboxes = screen.getAllByRole('textbox');
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+      });
+
+      // Set dates - end date before start date
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const startDate = '2099-06-15T14:00';
+      const endDate = '2099-06-14T14:00'; // Before start
+      await act(async () => {
+        fireEvent.change(dateInputs[0], { target: { value: startDate } });
+        fireEvent.change(dateInputs[1], { target: { value: endDate } });
+      });
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        const errors = screen.getAllByText('End date must be after start date');
+        expect(errors.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('shows validation error when end date is set without start date', async () => {
+      await renderAndWait();
+
+      // Fill in name
+      const textboxes = screen.getAllByRole('textbox');
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+      });
+
+      // Set only end date
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const endDate = '2099-06-15T14:00';
+      await act(async () => {
+        fireEvent.change(dateInputs[1], { target: { value: endDate } });
+      });
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        const errors = screen.getAllByText('Start date is required when end date is set');
+        expect(errors.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('allows event creation with valid future dates', async () => {
+      const mockOnCreateEvent = jest.fn().mockResolvedValue('0x1234567890abcdef');
+      await renderAndWait({ onCreateEvent: mockOnCreateEvent });
+
+      // Fill in name
+      const textboxes = screen.getAllByRole('textbox');
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+      });
+
+      // Set valid future dates
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const startDate = '2099-06-15T14:00';
+      const endDate = '2099-06-16T18:00';
+      await act(async () => {
+        fireEvent.change(dateInputs[0], { target: { value: startDate } });
+        fireEvent.change(dateInputs[1], { target: { value: endDate } });
+      });
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        expect(mockOnCreateEvent).toHaveBeenCalled();
+      });
+    });
+
+    it('allows event creation with only start date (no end date)', async () => {
+      const mockOnCreateEvent = jest.fn().mockResolvedValue('0x1234567890abcdef');
+      await renderAndWait({ onCreateEvent: mockOnCreateEvent });
+
+      // Fill in name
+      const textboxes = screen.getAllByRole('textbox');
+      await act(async () => {
+        fireEvent.change(textboxes[0], { target: { value: 'Test Event' } });
+      });
+
+      // Set only start date
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const startDate = '2099-06-15T14:00';
+      await act(async () => {
+        fireEvent.change(dateInputs[0], { target: { value: startDate } });
+      });
+
+      const createButton = screen.getByText('Create Event');
+      await act(async () => {
+        fireEvent.click(createButton);
+      });
+
+      await waitFor(() => {
+        expect(mockOnCreateEvent).toHaveBeenCalled();
+      });
+    });
+
+    it('shows field-level error on blur for past start date', async () => {
+      await renderAndWait();
+
+      const dateInputs = document.querySelectorAll('input[type="datetime-local"]');
+      const pastDate = '2020-01-01T12:00';
+
+      await act(async () => {
+        fireEvent.change(dateInputs[0], { target: { value: pastDate } });
+        fireEvent.blur(dateInputs[0]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Start date must be in the future')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Arweave confirmation', () => {
     const { uploadEventMetadata, waitForArweaveConfirmation } = require('../../util/arweaveUpload');
 

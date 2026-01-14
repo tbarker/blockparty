@@ -143,9 +143,26 @@ class NewEventDialog extends Component {
       return validator(value);
     }
 
-    // Special validation for endDate (must be after start date)
-    if (field === 'endDate' && value && this.state.date) {
-      return validators.dateAfter(value, this.state.date, { fieldName: 'End date' });
+    // Special validation for date fields
+    if (field === 'date' && value) {
+      return validators.dateFuture(value, { fieldName: 'Start date' });
+    }
+
+    if (field === 'endDate') {
+      // Check if end date requires start date
+      const requiresStartError = validators.dateRequiresStart(value, this.state.date, { fieldName: 'End date' });
+      if (requiresStartError) return requiresStartError;
+
+      // Check if end date is in the future
+      if (value) {
+        const futureError = validators.dateFuture(value, { fieldName: 'End date' });
+        if (futureError) return futureError;
+      }
+
+      // Check if end date is after start date
+      if (value && this.state.date) {
+        return validators.dateAfter(value, this.state.date, { fieldName: 'End date' });
+      }
     }
 
     return null;
@@ -225,11 +242,33 @@ class NewEventDialog extends Component {
       schemas.eventCreation
     );
 
-    // Additional validation for date range
-    if (date && endDate) {
-      const dateError = validators.dateAfter(endDate, date, { fieldName: 'End date' });
-      if (dateError) {
-        errors.endDate = dateError;
+    // Validate start date is in the future
+    if (date) {
+      const startDateError = validators.dateFuture(date, { fieldName: 'Start date' });
+      if (startDateError) {
+        errors.date = startDateError;
+      }
+    }
+
+    // Validate end date requires start date
+    const requiresStartError = validators.dateRequiresStart(endDate, date, { fieldName: 'End date' });
+    if (requiresStartError) {
+      errors.endDate = requiresStartError;
+    }
+
+    // Validate end date is in the future
+    if (endDate && !errors.endDate) {
+      const endDateFutureError = validators.dateFuture(endDate, { fieldName: 'End date' });
+      if (endDateFutureError) {
+        errors.endDate = endDateFutureError;
+      }
+    }
+
+    // Validate end date is after start date
+    if (date && endDate && !errors.endDate) {
+      const dateAfterError = validators.dateAfter(endDate, date, { fieldName: 'End date' });
+      if (dateAfterError) {
+        errors.endDate = dateAfterError;
       }
     }
 
@@ -241,6 +280,7 @@ class NewEventDialog extends Component {
       mapUrl: true,
       websiteUrl: true,
       twitterUrl: true,
+      date: true,
       endDate: true,
     };
 
@@ -564,6 +604,8 @@ class NewEventDialog extends Component {
                 onChange={this.handleChange('date')}
                 onBlur={this.handleBlur('date')}
                 disabled={creating || !factoryAvailable}
+                error={!!this.getFieldError('date')}
+                helperText={this.getFieldError('date')}
                 InputLabelProps={{ shrink: true }}
               />
               <TextField

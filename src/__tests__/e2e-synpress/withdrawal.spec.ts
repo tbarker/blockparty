@@ -26,9 +26,21 @@ import {
   setupMetaMaskNetwork,
   deployTestEvent,
   getWorkerAccounts,
+  safeReloadAndGetPage,
+  ensurePageReady,
+  stabilizeForComplexTest,
+  runDiagnostics,
 } from './fixtures';
 
 test.describe('Withdrawal Flow', () => {
+  // Run diagnostics on test failure to help identify root cause
+  test.afterEach(async ({ context }, testInfo) => {
+    if (testInfo.status !== 'passed') {
+      console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
+      await runDiagnostics(context, `TEST FAILURE: ${testInfo.title}`);
+    }
+  });
+
   test('should allow user to withdraw after attendance and payback', async ({
     context,
     page,
@@ -58,15 +70,25 @@ test.describe('Withdrawal Flow', () => {
     await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet with reload to ensure stable connection in CI
+    // This double-connect pattern ensures wagmi properly establishes the signer
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
+    await ensurePageReady(appPage);
 
-    // Register (handle max 15 chars after @)
+    // Wait for twitter input to be visible and register
     const handle = `@wdr${String(Date.now()).slice(-6)}`;
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
     await twitterInput.fill(handle);
-    await appPage.locator('button:has-text("RSVP")').click();
+
+    // Wait for RSVP button to be enabled before clicking
+    const rsvpButton = appPage.locator('button:has-text("RSVP")');
+    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
+    await rsvpButton.click();
 
     await waitForMetaMaskAndConfirm(metamask, context);
     await waitForTransactionSuccess(appPage);
@@ -143,20 +165,28 @@ test.describe('Withdrawal Flow', () => {
     await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet with reload to ensure stable connection in CI
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
+    await ensurePageReady(appPage);
 
-    // Register
+    // Wait for twitter input to be visible and register
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
     await twitterInput.fill('@wdr_visible');
-    await appPage.locator('button:has-text("RSVP")').click();
+
+    // Wait for RSVP button to be enabled before clicking
+    const rsvpButton = appPage.locator('button:has-text("RSVP")');
+    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
+    await rsvpButton.click();
 
     await waitForMetaMaskAndConfirm(metamask, context);
     await waitForTransactionSuccess(appPage);
 
     const withdrawButton = appPage.locator('button:has-text("Withdraw")');
-    const rsvpButton = appPage.locator('button:has-text("RSVP")');
 
     const isEventEnded = (await withdrawButton.count()) > 0;
 
@@ -191,15 +221,24 @@ test.describe('Withdrawal Flow', () => {
     await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet with reload to ensure stable connection in CI
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
+    await ensurePageReady(appPage);
 
-    // Register (handle max 15 chars after @)
+    // Wait for twitter input to be visible and register
     const handle = `@dbl${String(Date.now()).slice(-6)}`;
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
     await twitterInput.fill(handle);
-    await appPage.locator('button:has-text("RSVP")').click();
+
+    // Wait for RSVP button to be enabled before clicking
+    const rsvpButton = appPage.locator('button:has-text("RSVP")');
+    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
+    await rsvpButton.click();
 
     await waitForMetaMaskAndConfirm(metamask, context);
     await waitForTransactionSuccess(appPage);
@@ -209,6 +248,7 @@ test.describe('Withdrawal Flow', () => {
     await appPage.reload();
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
+    await ensurePageReady(appPage);
 
     // Mark attendance if checkbox available
     const attendCheckbox = appPage.locator('input[type="checkbox"]').first();

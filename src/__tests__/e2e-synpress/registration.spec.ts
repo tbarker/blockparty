@@ -28,9 +28,21 @@ import {
   setupMetaMaskNetwork,
   deployTestEvent,
   getWorkerAccounts,
+  safeReloadAndGetPage,
+  ensurePageReady,
+  stabilizeForComplexTest,
+  runDiagnostics,
 } from './fixtures';
 
 test.describe('Registration Flow', () => {
+  // Run diagnostics on test failure to help identify root cause
+  test.afterEach(async ({ context }, testInfo) => {
+    if (testInfo.status !== 'passed') {
+      console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
+      await runDiagnostics(context, `TEST FAILURE: ${testInfo.title}`);
+    }
+  });
+
   test('should display event details on page load', async ({
     context,
     page,
@@ -142,7 +154,9 @@ test.describe('Registration Flow', () => {
     await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet with reload to ensure stable connection in CI
+    appPage = await connectWalletIfNeeded(appPage, metamask, context);
+    appPage = await safeReloadAndGetPage(appPage, context);
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
@@ -197,14 +211,21 @@ test.describe('Registration Flow', () => {
     await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet - simplified to avoid overwhelming Anvil with RPCs
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
+    await ensurePageReady(appPage);
 
-    // Register
+    // Wait for twitter input to be visible and interactable
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
     await twitterInput.fill('@count_test');
-    await appPage.locator('button:has-text("RSVP")').click();
+
+    // Wait for RSVP button to be enabled before clicking
+    const rsvpButton = appPage.locator('button:has-text("RSVP")');
+    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
+    await rsvpButton.click();
 
     // Confirm transaction and wait for completion
     await waitForMetaMaskAndConfirm(metamask, context);
@@ -245,20 +266,30 @@ test.describe('Registration Flow', () => {
     await injectE2EConfigWithContract(appPage, contractAddress);
     await appPage.goto('http://localhost:3000/');
 
-    // Connect wallet
+    // Connect wallet - simplified to avoid overwhelming Anvil with RPCs
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
+    await ensurePageReady(appPage);
 
-    // Register a user
+    // Wait for twitter input to be visible and interactable
     const twitterInput = appPage.locator('input[placeholder*="twitter"]');
+    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
     await twitterInput.fill('@table_test');
-    await appPage.locator('button:has-text("RSVP")').click();
+
+    // Wait for RSVP button to be enabled before clicking
+    const rsvpButton = appPage.locator('button:has-text("RSVP")');
+    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
+    await rsvpButton.click();
 
     // Confirm transaction and wait for table to update
     await waitForMetaMaskAndConfirm(metamask, context);
     await waitForTransactionComplete(appPage, {
       expectElement: 'table',
     });
+
+    // Dismiss any modals that might have appeared during transaction
+    await ensurePageReady(appPage);
 
     // Verify participants table
     await expect(appPage.locator('table')).toBeVisible({ timeout: 10000 });

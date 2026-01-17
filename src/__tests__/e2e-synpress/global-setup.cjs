@@ -16,8 +16,8 @@ const fs = require('fs');
 
 const ANVIL_PORT = 8545;
 // URL for both Node.js and browser to connect to Anvil
-// Using 127.0.0.1 to avoid DNS resolution issues in containers
-const ANVIL_URL = `http://127.0.0.1:${ANVIL_PORT}`;
+// Using localhost for consistency with wagmi config
+const ANVIL_URL = `http://localhost:${ANVIL_PORT}`;
 const STATE_FILE = path.join(__dirname, '.e2e-state.json');
 
 // Anvil's first pre-funded account (deployer)
@@ -52,9 +52,15 @@ async function startAnvil() {
   console.log('[E2E Setup] Starting Anvil...');
 
   // Use --host 0.0.0.0 to bind to all interfaces, ensuring browser can access it
+  // Use --prune-history to reduce memory usage during long test runs
   const anvil = spawn(
     'anvil',
-    ['--host', '0.0.0.0', '--port', ANVIL_PORT.toString(), '--chain-id', '1337'],
+    [
+      '--host', '0.0.0.0',
+      '--port', ANVIL_PORT.toString(),
+      '--chain-id', '1337',
+      '--prune-history',  // Helps reduce memory usage for long-running tests
+    ],
     {
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
@@ -63,6 +69,39 @@ async function startAnvil() {
 
   // Store PID for cleanup
   global.__ANVIL_PID__ = anvil.pid;
+
+  // Log Anvil output for debugging - capture to help diagnose issues
+  const anvilLogPath = path.join(__dirname, '.anvil-output.log');
+  const logStream = fs.createWriteStream(anvilLogPath, { flags: 'w' });
+
+  anvil.stdout.on('data', (data) => {
+    const output = data.toString();
+    logStream.write(`[STDOUT ${new Date().toISOString()}] ${output}`);
+    // Also log important messages to console
+    if (output.includes('error') || output.includes('Error') || output.includes('warning')) {
+      console.log('[Anvil STDOUT]', output.trim());
+    }
+  });
+
+  anvil.stderr.on('data', (data) => {
+    const output = data.toString();
+    logStream.write(`[STDERR ${new Date().toISOString()}] ${output}`);
+    // Always log stderr to console as it may indicate problems
+    console.log('[Anvil STDERR]', output.trim());
+  });
+
+  anvil.on('error', (error) => {
+    console.error('[Anvil Process Error]', error.message);
+    logStream.write(`[ERROR ${new Date().toISOString()}] ${error.message}\n`);
+  });
+
+  anvil.on('exit', (code, signal) => {
+    console.log(`[Anvil] Process exited with code ${code}, signal ${signal}`);
+    logStream.write(`[EXIT ${new Date().toISOString()}] code=${code}, signal=${signal}\n`);
+    logStream.end();
+  });
+
+  console.log(`[E2E Setup] Anvil PID: ${anvil.pid}, logs at: ${anvilLogPath}`);
 
   // Wait for Anvil to be ready with exponential backoff
   // Optimized: Anvil typically starts in <500ms, so use faster polling

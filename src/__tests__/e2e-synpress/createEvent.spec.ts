@@ -27,11 +27,21 @@ import {
   setupMetaMaskNetwork,
   dismissWelcomeModal,
   waitForAppLoad,
+  waitForPageReady,
   switchAccount,
   getWorkerAccounts,
+  runDiagnostics,
 } from './fixtures';
 
 test.describe('Create Event Flow', () => {
+  // Run diagnostics on test failure to help identify root cause
+  test.afterEach(async ({ context }, testInfo) => {
+    if (testInfo.status !== 'passed') {
+      console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
+      await runDiagnostics(context, `TEST FAILURE: ${testInfo.title}`);
+    }
+  });
+
   test('should show "+ New Event" button when wallet is connected', async ({
     context,
     page,
@@ -51,7 +61,7 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
 
     // Wait for app to render
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Verify "+ New Event" button is visible (replaces arbitrary 2000ms wait)
@@ -76,7 +86,7 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Click "+ New Event" button (wait for it instead of arbitrary timeout)
@@ -168,7 +178,7 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Click "+ New Event" button in AppBar (wait for it instead of arbitrary timeout)
@@ -212,11 +222,15 @@ test.describe('Create Event Flow', () => {
 
     // Get the new contract address - find the text that matches the address pattern
     // The address is in a Typography element that follows the label
+    // Use the specific success dialog to avoid matching the Welcome modal
     const addressPattern = /0x[a-fA-F0-9]{40}/;
-    const dialogContent = await appPage.locator('[role="dialog"]').textContent();
+    const dialogContent = await appPage.locator('[role="dialog"]:has-text("Event Created Successfully")').textContent();
     const addressMatch = dialogContent?.match(addressPattern);
     expect(addressMatch).not.toBeNull();
     const newContractAddress = addressMatch![0];
+
+    // Dismiss any welcome modal that may be blocking the success dialog
+    await dismissWelcomeModal(appPage);
 
     // Click "Go to Event" button
     const goToEventButton = appPage.locator('button:has-text("Go to Event")');
@@ -224,7 +238,7 @@ test.describe('Create Event Flow', () => {
     await goToEventButton.click();
 
     // Wait for navigation and event page to load
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Verify we're on the new event page (wait for URL instead of arbitrary timeout)
@@ -256,7 +270,7 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Open dialog (wait for button instead of arbitrary timeout)
@@ -302,7 +316,7 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Open dialog (wait for button instead of arbitrary timeout)
@@ -339,7 +353,7 @@ test.describe('Create Event Flow', () => {
 
     // Connect wallet
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await dismissWelcomeModal(appPage);
 
     // Open dialog (wait for button instead of arbitrary timeout)
@@ -440,7 +454,7 @@ test.describe('Create Event Flow', () => {
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
 
     // Wait for app to fully load (includes proper modal dismissal timing)
-    await appPage.waitForLoadState('networkidle');
+    await waitForPageReady(appPage);
     await appPage
       .waitForFunction(
         () => {

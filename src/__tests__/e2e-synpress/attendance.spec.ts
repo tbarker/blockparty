@@ -26,9 +26,19 @@ import {
   setupMetaMaskNetwork,
   deployTestEvent,
   getWorkerAccounts,
+  safeReloadAndGetPage,
+  runDiagnostics,
 } from './fixtures';
 
 test.describe('Admin Attendance Flow', () => {
+  // Run diagnostics on test failure to help identify root cause
+  test.afterEach(async ({ context }, testInfo) => {
+    if (testInfo.status !== 'passed') {
+      console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
+      await runDiagnostics(context, `TEST FAILURE: ${testInfo.title}`);
+    }
+  });
+
   test('should show admin controls when connected as owner', async ({
     context,
     page,
@@ -61,7 +71,7 @@ test.describe('Admin Attendance Flow', () => {
     // Connect wallet and reload to ensure correct account is recognized
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     // Reload immediately to ensure admin account is recognized (skip first waitForAppLoad)
-    await appPage.reload();
+    appPage = await safeReloadAndGetPage(appPage, context);
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
@@ -127,7 +137,7 @@ test.describe('Admin Attendance Flow', () => {
 
     // Switch to admin (suite-specific admin account)
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
-    await appPage.reload();
+    appPage = await safeReloadAndGetPage(appPage, context);
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
@@ -198,7 +208,7 @@ test.describe('Admin Attendance Flow', () => {
 
     // Switch to admin and mark attendance
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
-    await appPage.reload();
+    appPage = await safeReloadAndGetPage(appPage, context);
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 
@@ -355,7 +365,7 @@ test.describe('Admin Attendance Flow', () => {
 
     // Switch to admin and mark attendance (suite-specific admin account)
     await switchAccount(metamask, ACCOUNTS.admin.metamaskName);
-    await appPage.reload();
+    appPage = await safeReloadAndGetPage(appPage, context);
     appPage = await connectWalletIfNeeded(appPage, metamask, context);
     await waitForAppLoad(appPage);
 

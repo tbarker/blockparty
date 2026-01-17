@@ -8,13 +8,11 @@
  * and cleaned up in globalTeardown.
  *
  * PARALLELIZATION STRATEGY:
- * - Tests run fully parallel across N workers where N = CPU cores (fullyParallel: true)
- * - Each test deploys its own contract for isolation
- * - Accounts are assigned dynamically based on parallelIndex:
- *   - Each worker gets 2 accounts (admin + user) from the account pool
- *   - Account pool: 10 Anvil accounts (indices 0-9)
- *   - Worker N uses: admin=Account[N*2], user=Account[N*2+1]
- * - Event contracts don't interact, so no cross-test coordination needed
+ * - Tests can run in parallel across spec files
+ * - Each test deploys its own contract for full isolation
+ * - Each worker gets its own browser context with MetaMask
+ * - Workers use dedicated account pairs to avoid nonce conflicts
+ * - Worker count capped at 2 for stability (4+ causes wallet connection issues)
  *
  * @see https://docs.synpress.io/docs/setup-playwright
  */
@@ -22,21 +20,18 @@
 import { defineConfig, devices } from '@playwright/test';
 import os from 'os';
 
-// Determine optimal worker count based on system resources
-// Each Synpress worker runs a full Chrome browser with MetaMask extension
-// which is resource-intensive (~300-500MB per browser)
+// Determine optimal worker count based on environment
+// Cap at 2 workers for stability - higher parallelism causes wallet connection
+// synchronization issues due to resource contention on shared Anvil/xvfb
 const cpuCount = os.cpus().length;
-// Use all cores, but cap at 5 to stay within our 10-account pool (5 pairs)
-const maxWorkers = Math.min(cpuCount, 5);
+const maxWorkers = Math.min(cpuCount, 2);
 
 export default defineConfig({
   testDir: './src/__tests__/e2e-synpress',
 
-  // Run all tests fully parallel - each test deploys its own contract
-  // Tests are independent since event contracts don't interact
-  fullyParallel: true,
-  // Workers dynamically set to CPU core count, capped at 5 (account pool limit)
-  // Each worker runs a full Chrome browser with MetaMask extension (heavy)
+  // Sequential test execution within files
+  // With >1 worker, different spec files run in parallel on different workers
+  fullyParallel: false,
   workers: maxWorkers,
 
   // Fail the build on CI if you accidentally left test.only in the source code

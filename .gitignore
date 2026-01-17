@@ -27,3 +27,7 @@ wallet-cache/
 
 # Opencode auth file
 .opencode/
+bin/act
+
+# E2E test artifacts
+src/__tests__/e2e-synpress/.anvil-output.log

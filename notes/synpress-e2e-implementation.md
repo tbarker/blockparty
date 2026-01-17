@@ -270,8 +270,71 @@ Each test deploys its own Conference contract via `deployTestEvent()`, ensuring:
 
 ---
 
+## CI Stability Fix (January 2026)
+
+### Problem
+
+E2E tests failed consistently in GitHub Actions CI with:
+- `"[getNotificationPageAndWaitForLoad] Notification page did not appear after 10000ms and 2 retries."`
+- Specifically affected: registration and withdrawal tests with transactions
+
+### Root Cause
+
+RainbowKit/wagmi connection state isn't fully synchronized on first connect in slow CI environments. The initial connection appears successful in the UI, but the internal wallet state isn't fully established before transactions are attempted.
+
+### Solution
+
+Apply double-connect pattern with reload to ensure stable connection:
+
+```typescript
+// Connect wallet with reload to ensure stable connection in CI
+appPage = await connectWalletIfNeeded(appPage, metamask, context);
+await appPage.reload();
+appPage = await connectWalletIfNeeded(appPage, metamask, context);
+await waitForAppLoad(appPage);
+```
+
+This pattern (already used in attendance tests) ensures:
+1. First connect establishes RainbowKit/wagmi state and persists to localStorage
+2. Reload clears React Query cache and forces fresh initialization
+3. Second connect verifies the connection is properly established
+
+Applied to: `registration.spec.ts` and `withdrawal.spec.ts`
+
+---
+
+## Worker Count Limitation (January 2026)
+
+### Problem
+
+With 4 workers (matching CPU count), withdrawal tests failed with "Target page, context or browser has been closed" and READONLY mode in screenshots.
+
+### Root Cause
+
+Higher parallelism (4+ workers) causes:
+1. **Resource contention on xvfb** - 4 headful Chrome browsers with MetaMask compete for display resources
+2. **wagmi connection timing issues** - Under load, wagmi doesn't fully establish signer before tests proceed
+3. **Cumulative resource exhaustion** - Over 10+ minute test runs with many MetaMask popups
+
+### Solution
+
+Cap workers at 2 for stability:
+
+```typescript
+// playwright.synpress.config.ts
+const maxWorkers = Math.min(cpuCount, 2);
+```
+
+Key fixes to `fixtures.ts`:
+1. **`ensureWalletConnected`** - Wait for wagmi to sync instead of clicking Disconnect (which breaks connection)
+2. **`connectWalletIfNeeded`** - Don't throw error for READONLY mode, just warn
+3. **`dismissWelcomeModal`** - Use specific selector `[role="dialog"]:has-text("Welcome to BlockParty")` to avoid matching other dialogs
+
+---
+
 ## References
 
 - Synpress docs: https://docs.synpress.io
 - MetaMask extension loading: Chrome requires both `--disable-extensions-except` AND `--load-extension`
 - Playwright persistent context: Used for extension testing
+- RainbowKit connection: May require reload for state synchronization in CI

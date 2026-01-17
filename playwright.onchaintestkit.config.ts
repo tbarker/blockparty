@@ -1,36 +1,30 @@
 /**
- * Playwright Configuration for Synpress E2E Tests
+ * Playwright Configuration for OnchainTestKit E2E Tests
  *
- * Uses real MetaMask extension for wallet interactions.
+ * Uses OnchainTestKit for wallet interactions with MetaMask.
  * Runs headful with xvfb in containers (devcontainer and CI).
- *
- * Self-contained: Anvil is started and contracts deployed in globalSetup,
- * and cleaned up in globalTeardown.
  *
  * PARALLELIZATION STRATEGY:
  * - Tests can run in parallel across spec files
  * - Each test deploys its own contract for full isolation
- * - Each worker gets its own browser context with MetaMask
- * - Workers use dedicated account pairs to avoid nonce conflicts
- * - Worker count capped at 2 for stability (4+ causes wallet connection issues)
- *
- * @see https://docs.synpress.io/docs/setup-playwright
+ * - LocalNodeManager allocates unique ports per worker
+ * - Worker count increased from 2 (Synpress) to up to 10
  */
 
 import { defineConfig, devices } from '@playwright/test';
 import os from 'os';
 
-// Determine optimal worker count based on environment
-// Cap at 2 workers for stability - higher parallelism causes wallet connection
-// synchronization issues due to resource contention on shared Anvil/xvfb
-const cpuCount = os.cpus().length;
-const maxWorkers = Math.min(cpuCount, 2);
+// Parallelize based on CPUs, capped for MetaMask/Anvil stability
+// - Tests within same file run sequentially (fullyParallel: false)
+// - Different spec files run in parallel across workers
+// - Max 2 workers to avoid MetaMask extension race conditions and Anvil nonce conflicts
+const maxWorkers = Math.min(os.cpus().length, 2);
 
 export default defineConfig({
-  testDir: './src/__tests__/e2e-synpress',
+  testDir: './src/__tests__/e2e',
 
-  // Sequential test execution within files
-  // With >1 worker, different spec files run in parallel on different workers
+  // Tests within same file run sequentially to avoid OnchainTestKit state conflicts
+  // Different spec files run in parallel across workers
   fullyParallel: false,
   workers: maxWorkers,
 
@@ -55,8 +49,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
-  // Test timeout (blockchain transactions can be slow)
-  timeout: 240000,
+  // Test timeout - can reduce from 240000 with better handling
+  timeout: 180000,
 
   // Expect timeout for assertions
   expect: {
@@ -69,7 +63,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Synpress requires headful mode for MetaMask extension
+        // OnchainTestKit requires headful mode for MetaMask extension
         headless: false,
         // Chromium args for container environment with xvfb
         launchOptions: {
@@ -96,7 +90,7 @@ export default defineConfig({
     stderr: 'pipe',
   },
 
-  // Global setup/teardown for Anvil blockchain and contract deployment
-  globalSetup: './src/__tests__/e2e-synpress/global-setup.cjs',
-  globalTeardown: './src/__tests__/e2e-synpress/global-teardown.cjs',
+  // Global setup/teardown for Anvil management
+  globalSetup: './src/__tests__/e2e/global-setup.cjs',
+  globalTeardown: './src/__tests__/e2e/global-teardown.cjs',
 });

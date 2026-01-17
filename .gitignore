@@ -20,8 +20,9 @@ tmp
 test-results/
 playwright-report/
 .e2e-state.json
+/e2e/
 
-# Synpress wallet cache
+# OnchainTestKit/E2E wallet cache
 .cache-synpress/
 wallet-cache/
 
@@ -30,4 +31,4 @@ wallet-cache/
 bin/act
 
 # E2E test artifacts
-src/__tests__/e2e-synpress/.anvil-output.log
+src/__tests__/e2e/.anvil-output.log

@@ -67,27 +67,19 @@ This document tracks upgrades deferred to maintain stability.
 - Upgraded react-dom 18.3.1 -> 19.x
 - Upgraded @testing-library/react 14.x -> 16.x
 
-## Deferred
+## Completed
 
-### Synpress for E2E Wallet Testing
+### OnchainTestKit E2E Wallet Testing
 
-**Current:** Custom `mockEthereum.js` that simulates MetaMask and forwards RPC to Anvil
-**Alternative:** Synpress (`@synthetixio/synpress`) - E2E framework with real MetaMask automation
+**Status:** Complete
 
-**Why deferred:**
-
-- Current custom approach is simpler and faster (no extension overhead)
-- Synpress requires Xvfb/display server in CI for browser extensions
-- May have Docker/devcontainer compatibility issues
-- Custom mock is working and sufficient for current needs
-
-**Revisit if:**
-
-- Need to test actual MetaMask-specific behaviors (signing UX, network switching prompts)
-- Custom mock becomes a maintenance burden
-- Synpress improves headless/container support
-
-**Note:** `@depay/web3-mock` was evaluated but is not suitable - it mocks RPC responses entirely rather than forwarding to a real blockchain.
+- Migrated from Synpress to OnchainTestKit (Coinbase's wallet testing library)
+- Uses real MetaMask browser extension (v12.8.1)
+- Tests run with xvfb in devcontainer and CI
+- 11 comprehensive tests covering registration, attendance, and admin flows
+- Each test deploys its own contract for isolation
+- Handles MetaMask 12.x two-step connection flow (connect + permissions)
+- Custom network setup for MetaMask 12.8.1 compatibility
 
 ### TypeScript Migration
 
@@ -108,18 +100,17 @@ This document tracks upgrades deferred to maintain stability.
 - Add E2E tests with Playwright
 - Target >80% coverage
 
-### E2E Tests (Playwright)
+### E2E Tests (OnchainTestKit/Playwright)
 
 **Status:** Complete
 
-- Implemented E2E tests using Playwright + custom wallet mock
+- Implemented E2E tests using Playwright + OnchainTestKit with real MetaMask
 - Test files in `src/__tests__/e2e/`:
-  - `registration.spec.mjs` - User registration flow
-  - `attendance.spec.mjs` - Admin attendance marking
-  - `withdrawal.spec.mjs` - Withdrawal after event ends
-- Custom `mockEthereum.js` simulates MetaMask, forwards transactions to Anvil
+  - `registration.spec.ts` - User registration flow (5 tests)
+  - `attendance.spec.ts` - Admin attendance and event management (6 tests)
+- OnchainTestKit handles MetaMask wallet setup and interactions
 - Run with `npm run test:e2e`
-- All 14 tests passing in CI
+- All 11 tests passing in CI
 
 #### Future Testing Improvements
 

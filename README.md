@@ -125,7 +125,7 @@ The project has four levels of testing:
 1. **Smart Contract Tests** (Forge/Solidity) - Unit tests for the Solidity contracts
 2. **UI Component Tests** (Jest/React Testing Library) - Unit tests for React components
 3. **Integration Tests** (Jest/Anvil) - Tests contract interactions from JavaScript
-4. **E2E Tests** (Synpress/Playwright) - Full browser tests with real MetaMask extension
+4. **E2E Tests** (OnchainTestKit/Playwright) - Full browser tests with real MetaMask extension
 
 ```bash
 # Smart contract tests (Forge)
@@ -158,7 +158,7 @@ npm run lint
 
 ### E2E Tests with Real MetaMask
 
-The E2E tests use [Synpress](https://synpress.io/) to test with a real MetaMask browser extension. This provides true end-to-end testing of wallet interactions including:
+The E2E tests use [OnchainTestKit](https://github.com/coinbase/onchaintestkit) (Coinbase's wallet testing library) to test with a real MetaMask browser extension. This provides true end-to-end testing of wallet interactions including:
 
 - Wallet connection approval
 - Transaction signing and confirmation
@@ -173,17 +173,9 @@ The E2E tests use [Synpress](https://synpress.io/) to test with a real MetaMask 
 The tests automatically:
 
 1. Start Anvil (local Ethereum node)
-2. Deploy the Conference contract
-3. Build MetaMask wallet cache with test accounts
+2. Deploy the Conference contract per test (isolation)
+3. Configure MetaMask with test wallet and local network
 4. Run tests with real MetaMask interactions
-
-```bash
-# Build/rebuild the MetaMask wallet cache
-npm run synpress:cache
-
-# Force rebuild (if wallet setup changes)
-npm run synpress:cache:force
-```
 
 ### Running Locally
 

@@ -12,6 +12,6 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/__tests__/e2e-synpress/**/*.ts", "playwright.synpress.config.ts"],
+  "include": ["src/__tests__/e2e/**/*.ts", "playwright.onchaintestkit.config.ts"],
   "exclude": ["node_modules"]
 }

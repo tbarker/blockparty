@@ -21,26 +21,16 @@ forge install --no-git 2>/dev/null || echo "Forge dependencies already installed
 echo "Building contracts..."
 forge build
 
-# Install Chromium for Synpress E2E testing
-# Both @playwright/test and Synpress use playwright-core@1.48.2 (Chromium 1140)
-# The dependencies are deduped to node_modules/playwright-core
-echo "Installing Chromium for Synpress (playwright-core 1.48.2 / Chromium 1140)..."
-if [ -f "node_modules/playwright-core/cli.js" ]; then
-    node node_modules/playwright-core/cli.js install chromium
-else
-    # Fallback to npx if direct path doesn't exist
-    npx playwright install chromium || echo "Warning: Chromium installation may need manual intervention"
-fi
+# Install Chromium for Playwright E2E testing
+echo "Installing Chromium for Playwright..."
+npx playwright install chromium || echo "Warning: Chromium installation may need manual intervention"
 
-# Build Synpress wallet cache (MetaMask extension setup)
-# This pre-configures MetaMask with test wallet so E2E tests don't need to set it up each time
-echo "Building Synpress wallet cache..."
-SYNPRESS_WALLET_SETUP="src/__tests__/e2e-synpress/wallet-setup"
-if [ -d "$SYNPRESS_WALLET_SETUP" ]; then
-    # xvfb-run provides virtual display for headful browser in container
-    xvfb-run npx synpress "$SYNPRESS_WALLET_SETUP" || echo "Warning: Synpress cache build failed. You may need to run: xvfb-run npx synpress $SYNPRESS_WALLET_SETUP"
+# Prepare MetaMask for OnchainTestKit E2E tests
+echo "Preparing MetaMask for E2E tests..."
+if [ -f "scripts/prepare-metamask.mjs" ]; then
+    node scripts/prepare-metamask.mjs || echo "Warning: MetaMask preparation may need manual intervention"
 else
-    echo "Synpress wallet setup directory not found, skipping cache build"
+    echo "MetaMask preparation script not found, skipping"
 fi
 
 echo ""
@@ -61,9 +51,9 @@ echo "  forge test -vvv          - Run tests with verbose output"
 echo "  forge build              - Compile contracts"
 echo "  forge coverage           - Generate coverage report"
 echo ""
-echo "E2E Testing (Synpress + MetaMask):"
-echo "  npm run test:e2e         - Run E2E tests (requires Anvil running)"
-echo "  Rebuild cache:           - xvfb-run npx synpress src/__tests__/e2e-synpress/wallet-setup"
+echo "E2E Testing (OnchainTestKit + MetaMask):"
+echo "  npm run test:e2e         - Run E2E tests (starts Anvil automatically)"
+echo "  npm run test:e2e:debug   - Run E2E tests in debug mode"
 echo ""
 echo "Deployment:"
 echo "  npm run deploy:local     - Deploy to local Anvil node"

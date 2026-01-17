@@ -116,7 +116,7 @@ jobs:
           CI: true
 
   e2e:
-    name: E2E Tests (Synpress)
+    name: E2E Tests (OnchainTestKit)
     runs-on: ubuntu-latest
     needs: [smart-contracts, react-ui]
 
@@ -141,12 +141,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright Browsers
-        run: |
-          # Install browsers for the project's Playwright version (chromium-1200)
-          npx playwright install chromium --with-deps
-          # Install browsers for Synpress's internal playwright-core@1.48.2 (chromium-1140)
-          # This is required because synpress-cache uses an older bundled playwright-core
-          npx playwright@1.48.2 install chromium
+        run: npx playwright install chromium --with-deps
 
       - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
@@ -154,25 +149,13 @@ jobs:
       - name: Build contracts
         run: forge build
 
-      - name: Get Chromium 1140 path
-        id: chromium-path
-        run: |
-          # Find the chromium-1140 installation path
-          CHROMIUM_PATH=$(find ~/.cache/ms-playwright -name "chrome" -path "*chromium-1140*" -type f 2>/dev/null | head -1)
-          echo "path=$CHROMIUM_PATH" >> $GITHUB_OUTPUT
-          echo "Found Chromium 1140 at: $CHROMIUM_PATH"
-
-      - name: Build Synpress wallet cache
-        run: xvfb-run npx synpress src/__tests__/e2e-synpress/wallet-setup
-        env:
-          CI: true
-          SYNPRESS_CHROMIUM_PATH: ${{ steps.chromium-path.outputs.path }}
+      - name: Prepare MetaMask for OnchainTestKit
+        run: node scripts/prepare-metamask.mjs
 
       - name: Run E2E tests
-        run: xvfb-run npx playwright test --config playwright.synpress.config.ts
+        run: xvfb-run npx playwright test --config playwright.onchaintestkit.config.ts
         env:
           CI: true
-          SYNPRESS_CHROMIUM_PATH: ${{ steps.chromium-path.outputs.path }}
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4

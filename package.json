@@ -7,7 +7,6 @@
     "test": "test"
   },
   "scripts": {
-    "postinstall": "node scripts/patch-synpress.js",
     "lint": "npm run lint:js && npm run lint:sol",
     "lint:js": "eslint 'src/**/*.js' 'scripts/**/*.js' --fix",
     "lint:sol": "solhint 'contracts/**/*.sol'",
@@ -27,10 +26,8 @@
     "test:integration:verbose": "jest --config jest.config.js --testPathPattern='integration/(userJourney|adminWorkflow|errorHandling)' --runInBand --testTimeout=60000 --verbose",
     "test:all": "npm run test && npm run test:ui && npm run test:build",
     "test:full": "npm run test && npm run test:ui && npm run test:integration",
-    "test:e2e": "node scripts/ensure-synpress-cache.js && xvfb-run npx playwright test --config playwright.synpress.config.ts",
-    "test:e2e:debug": "node scripts/ensure-synpress-cache.js && xvfb-run npx playwright test --config playwright.synpress.config.ts --debug",
-    "synpress:cache": "xvfb-run npx synpress src/__tests__/e2e-synpress/wallet-setup",
-    "synpress:cache:force": "xvfb-run npx synpress src/__tests__/e2e-synpress/wallet-setup --force",
+    "test:e2e": "node scripts/prepare-metamask.mjs && xvfb-run npx playwright test --config playwright.onchaintestkit.config.ts",
+    "test:e2e:debug": "node scripts/prepare-metamask.mjs && xvfb-run npx playwright test --config playwright.onchaintestkit.config.ts --debug",
     "start": "webpack serve --mode development --port 3000",
     "dev": "webpack serve --mode development",
     "dev:local": "node scripts/dev-local.js",
@@ -91,9 +88,9 @@
     "@babel/preset-env": "^7.28.0",
     "@babel/preset-react": "^7.28.0",
     "@babel/runtime": "^7.28.0",
+    "@coinbase/onchaintestkit": "^1.2.0",
     "@eslint/js": "^9.0.0",
     "@playwright/test": "1.48.2",
-    "@synthetixio/synpress": "^4.1.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
@@ -170,7 +167,8 @@
       "eth-gas-reporter: Removed - requires truffle",
       "@digix/tempo: Removed - deprecated testing utility",
       "react-notifications: Removed - replaced with MUI Snackbar/Alert (used deprecated findDOMNode)",
-      "@depay/web3-mock: Removed - not used; E2E tests use custom mock that forwards to real Anvil"
+      "@depay/web3-mock: Removed - not used; E2E tests use custom mock that forwards to real Anvil",
+      "@synthetixio/synpress: Removed - replaced with @coinbase/onchaintestkit for E2E wallet testing"
     ],
     "_cannot_upgrade": [
       "event-emitter: 0.3.5 is latest, stable and works",

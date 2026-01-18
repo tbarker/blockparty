@@ -17,8 +17,10 @@ import os from 'os';
 // Parallelize based on CPUs, capped for MetaMask/Anvil stability
 // - Tests within same file run sequentially (fullyParallel: false)
 // - Different spec files run in parallel across workers
-// - Max 2 workers to avoid MetaMask extension race conditions and Anvil nonce conflicts
-const maxWorkers = Math.min(os.cpus().length, 2);
+// - IMPORTANT: Using 1 worker to avoid Anvil state conflicts when tests run in parallel
+//   Multiple workers cause "BlockOutOfRangeError" and transaction failures because
+//   parallel tests modify Anvil state while other tests are reading/writing
+const maxWorkers = 1;
 
 export default defineConfig({
   testDir: './src/__tests__/e2e',

@@ -17,7 +17,14 @@
 - **Per-test isolation**: Each test deploys its own contract via `deployTestEvent()`
 
 ### MetaMask 12.8.1 Workaround
-OnchainTestKit's `CONNECT_TO_DAPP` action doesn't work with MetaMask 12.8.1's two-step connection flow (Connect → Review permissions). The `connectWallet()` helper in fixtures.ts handles this correctly. Potential future improvement: test with newer MetaMask version.
+OnchainTestKit's `CONNECT_TO_DAPP` action doesn't work with MetaMask 12.8.1's two-step connection flow (Connect → Review permissions). The `connectWallet()` helper in fixtures.ts handles this correctly.
+
+**Newer MetaMask Version Experiment (2026-01-18):**
+Tested with MetaMask 12.20.1 to see if it would simplify the connection flow. Result: **Not viable**.
+- MetaMask 12.20.1 introduces a "What's New" modal (`data-testid="whats-new-modal"`) on first launch
+- This modal blocks all pointer events and OnchainTestKit doesn't know how to dismiss it
+- The automation would need additional handling for new modals in each MetaMask version
+- Conclusion: OnchainTestKit's pin to 12.8.1 is intentional; our `connectWallet()` helper is the correct approach
 
 ---
 

@@ -16,9 +16,9 @@ import os from 'os';
 
 // With per-test Anvil instances, we can enable parallel execution
 // Each test gets its own node with dynamic port allocation (8546-9545)
-// Start with 1 worker to verify the per-test Anvil approach works
-// TODO: Increase workers after verifying stability
-const maxWorkers = 1;
+// Tested: 4 workers and 3 workers caused failures due to resource contention
+// Using cpus/2 provides stable parallel execution (~15 min vs ~25 min with 1 worker)
+const maxWorkers = Math.max(Math.floor(os.cpus().length / 2), 1);
 
 export default defineConfig({
   testDir: './src/__tests__/e2e',

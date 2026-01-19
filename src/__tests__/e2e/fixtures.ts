@@ -3,9 +3,9 @@
  *
  * Provides test fixtures that integrate:
  * - OnchainTestKit for MetaMask wallet interactions
- * - Shared Anvil instance via global-setup.cjs
+ * - Per-test Anvil instances via LocalNodeManager (enables parallelization)
  * - Contract deployment helpers
- * - App-specific UI helpers
+ * - App-specific UI helpers (MetaMask 12.8.1 compatible)
  */
 
 import { test as base, expect } from '@playwright/test';
@@ -16,12 +16,10 @@ import {
   CHAIN_ID,
   ANVIL_URL,
   ANVIL_PORT,
-  loadE2EState,
 } from './config';
 import { checkAnvilHealth, runDiagnostics, waitForAnvil } from './diagnostics';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 // Use direct paths to avoid package.json exports resolution issues
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -29,18 +27,30 @@ const onchaintkitPath = path.join(process.cwd(), 'node_modules', '@coinbase', 'o
 const { createTempDir } = require(path.join(onchaintkitPath, 'utils', 'createTempDir.js'));
 const { removeTempDir } = require(path.join(onchaintkitPath, 'utils', 'removeTempDir.js'));
 const { getExtensionId } = require(path.join(onchaintkitPath, 'utils', 'extensionManager.js'));
+const { LocalNodeManager } = require(path.join(onchaintkitPath, 'node', 'LocalNodeManager.js'));
 /* eslint-enable @typescript-eslint/no-var-requires */
 
 // Re-export for convenience
 export { expect, BaseActionType, ActionApprovalType };
 export { checkAnvilHealth, runDiagnostics, waitForAnvil } from './diagnostics';
-export { ANVIL_ACCOUNTS, CHAIN_ID, ANVIL_URL, ANVIL_PORT, loadE2EState } from './config';
+export { ANVIL_ACCOUNTS, CHAIN_ID, ANVIL_URL, ANVIL_PORT } from './config';
 
 // Shared MetaMask state across tests in the same worker
 let sharedMetamaskPage: any;
-let sharedMetamaskContext: any;
 let sharedExtensionId: string;
 let networkAlreadyAdded = false;
+let currentNetworkPort: number | null = null;
+
+/**
+ * Get the Anvil RPC URL from the node fixture.
+ * Falls back to default ANVIL_URL if node is not available.
+ */
+export function getAnvilUrl(node: any): string {
+  if (node && typeof node.port === 'number') {
+    return `http://localhost:${node.port}`;
+  }
+  return ANVIL_URL;
+}
 
 /**
  * Add Anvil network to MetaMask with MetaMask 12.8.1 compatible selectors.
@@ -48,17 +58,20 @@ let networkAlreadyAdded = false;
  * OnchainTestKit's addNetwork function uses #networkName selector which doesn't
  * work reliably with MetaMask 12.8.1. This custom function handles the new UI.
  *
- * OPTIMIZATION: Skips if network was already added in this worker.
+ * OPTIMIZATION: Skips if network was already added with the same port in this worker.
  */
-async function addAnvilNetwork(metamaskPage: any): Promise<void> {
-  // Skip if already added in this worker session
-  if (networkAlreadyAdded) {
+async function addAnvilNetwork(metamaskPage: any, rpcUrl: string = ANVIL_URL): Promise<void> {
+  // Extract port from RPC URL
+  const portMatch = rpcUrl.match(/:(\d+)$/);
+  const port = portMatch ? parseInt(portMatch[1], 10) : ANVIL_PORT;
+
+  // Skip if already added with the same port in this worker session
+  if (networkAlreadyAdded && currentNetworkPort === port) {
     console.log('[addAnvilNetwork] Network already added, skipping');
     return;
   }
 
   const networkName = 'Localhost';
-  const rpcUrl = ANVIL_URL;
   const chainId = CHAIN_ID.toString();
   const symbol = 'ETH';
 
@@ -154,6 +167,7 @@ async function addAnvilNetwork(metamaskPage: any): Promise<void> {
     }
 
     networkAlreadyAdded = true;
+    currentNetworkPort = port;
     console.log(`[addAnvilNetwork] Network "${networkName}" added successfully`);
   } catch (error) {
     console.error('[addAnvilNetwork] Error adding network:', error);
@@ -199,14 +213,31 @@ async function switchToLocalhostNetwork(metamaskPage: any): Promise<void> {
 }
 
 /**
- * Custom test fixtures for OnchainTestKit with existing Anvil instance.
- * This bypasses the built-in setupWallet fixture that requires nodeConfig.
+ * Custom test fixtures for OnchainTestKit with per-test Anvil instances.
+ * Uses LocalNodeManager for parallel test execution support.
  */
 export const test = base.extend<{
+  node: any;
   metamask: MetaMask | null;
   metamaskPage: any;
   extensionId: string;
 }>({
+  // Per-test Anvil instance via LocalNodeManager
+  node: [async ({}, use) => {
+    const nodeConfig = walletConfig.nodeConfig;
+    if (nodeConfig) {
+      const node = new LocalNodeManager(nodeConfig);
+      await node.start();
+      console.log(`Node is ready on port ${node.port}`);
+      await use(node);
+      console.log('Node stopping...');
+      await node.stop();
+    } else {
+      // Fallback: no per-test node, use global Anvil
+      await use({ port: ANVIL_PORT, rpcUrl: ANVIL_URL });
+    }
+  }, { scope: 'test', auto: true }],
+
   // Create temp directory for extension data
   _contextPath: [async ({}, use, testInfo) => {
     const contextPath = await createTempDir(testInfo.testId);
@@ -215,8 +246,8 @@ export const test = base.extend<{
     if (error) console.error(error);
   }, { scope: 'test' }],
 
-  // Initialize MetaMask context
-  context: async ({ context: currentContext, _contextPath }: any, use: any) => {
+  // Initialize MetaMask context with RPC interception for dynamic port
+  context: async ({ context: currentContext, _contextPath, node }: any, use: any) => {
     try {
       // Extract the metamask-specific config for initialization
       const mmConfig = walletConfig.wallets?.metamask;
@@ -231,8 +262,9 @@ export const test = base.extend<{
       );
       sharedMetamaskPage = metamaskPage;
 
-      // Set up RPC interceptor for our existing Anvil instance
-      await setupRpcPortInterceptor(metamaskContext, ANVIL_PORT);
+      // Set up RPC interceptor for the per-test Anvil instance
+      const port = node?.port || ANVIL_PORT;
+      await setupRpcPortInterceptor(metamaskContext, port);
 
       await use(metamaskContext);
       await metamaskContext.close();
@@ -258,8 +290,8 @@ export const test = base.extend<{
     }
   },
 
-  // Create MetaMask wrapper
-  metamask: [async ({ context, extensionId }: any, use: any) => {
+  // Create MetaMask wrapper with per-test Anvil configuration
+  metamask: [async ({ context, extensionId, node }: any, use: any) => {
     try {
       // Extract the metamask-specific config from the built config
       const mmConfig = walletConfig.wallets?.metamask;
@@ -267,15 +299,18 @@ export const test = base.extend<{
         throw new Error('MetaMask config not found in walletConfig');
       }
 
+      const port = node?.port || ANVIL_PORT;
+      const rpcUrl = node?.rpcUrl || ANVIL_URL;
+
       const metamask = new MetaMask(mmConfig, context, sharedMetamaskPage, extensionId);
 
       // Run wallet setup manually (seed phrase import only, no network setup)
       if (mmConfig.walletSetup) {
-        await mmConfig.walletSetup(metamask, { localNodePort: ANVIL_PORT });
+        await mmConfig.walletSetup(metamask, { localNodePort: port });
       }
 
       // Add Anvil network using our custom function (MetaMask 12.8.1 compatible)
-      await addAnvilNetwork(sharedMetamaskPage);
+      await addAnvilNetwork(sharedMetamaskPage, rpcUrl);
 
       // Switch to the Localhost network
       await switchToLocalhostNetwork(sharedMetamaskPage);
@@ -602,14 +637,6 @@ export async function waitForTransactionComplete(
 }
 
 /**
- * Check if user can register (twitter input visible).
- */
-export async function canUserRegister(page: any): Promise<boolean> {
-  const twitterInput = page.locator('input[placeholder*="twitter"]');
-  return (await twitterInput.count()) > 0;
-}
-
-/**
  * Switch MetaMask account by index.
  * OnchainTestKit uses the same seed phrase, so accounts match Anvil accounts.
  * Account 0 = deployer, Account 1 = user1, etc.
@@ -780,45 +807,6 @@ export async function connectWallet(
     // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
     await handleMetaMaskConnection(context, extensionId);
   }
-}
-
-/**
- * Reload page and reconnect wallet.
- * Used when switching accounts to ensure app recognizes new account.
- */
-export async function reloadAndReconnect(
-  page: any,
-  metamask: any,
-  contractAddress: string
-): Promise<void> {
-  await page.reload();
-  await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-  await connectWallet(page, metamask);
-  await waitForAppLoad(page);
-}
-
-/**
- * Inject E2E config with factory address only (no contract).
- * Used for create-event tests where no contract exists yet.
- */
-export async function injectE2EConfigFactoryOnly(page: any): Promise<void> {
-  // Load the factory address from E2E state (set by global setup)
-  const state = loadE2EState();
-
-  await page.addInitScript(
-    (cfg: { factoryAddress: string; chainId: number }) => {
-      (window as any).__E2E_CONFIG__ = cfg;
-      try {
-        localStorage.setItem('blockparty_welcome_seen', 'true');
-      } catch {
-        // localStorage may not be available
-      }
-    },
-    {
-      factoryAddress: state.factoryAddress,
-      chainId: state.chainId || CHAIN_ID,
-    }
-  );
 }
 
 /**

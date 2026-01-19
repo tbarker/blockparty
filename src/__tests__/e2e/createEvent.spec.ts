@@ -19,8 +19,11 @@ import {
   expect,
   BaseActionType,
   ActionApprovalType,
-  ANVIL_URL,
-  injectE2EConfigFactoryOnly,
+  ANVIL_ACCOUNTS,
+  CHAIN_ID,
+  getAnvilUrl,
+  deployFactory,
+  injectE2EConfig,
   dismissWelcomeModal,
   waitForAppLoad,
   waitForPageReady,
@@ -31,18 +34,26 @@ import { runDiagnostics } from './diagnostics';
 
 test.describe('Create Event Flow', () => {
   // Run diagnostics on test failure
-  test.afterEach(async ({}, testInfo) => {
+  test.afterEach(async ({ node }, testInfo) => {
     if (testInfo.status !== 'passed') {
+      const rpcUrl = getAnvilUrl(node);
       console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
-      await runDiagnostics(ANVIL_URL, null, `TEST FAILURE: ${testInfo.title}`);
+      await runDiagnostics(rpcUrl, null, `TEST FAILURE: ${testInfo.title}`);
     }
   });
 
-  test('should show "+ New Event" button when wallet is connected', async ({ page, metamask }) => {
+  test('should show "+ New Event" button when wallet is connected', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config with factory address (no contract needed)
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -55,11 +66,18 @@ test.describe('Create Event Flow', () => {
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
   });
 
-  test('should open New Event dialog when clicking "+ New Event"', async ({ page, metamask }) => {
+  test('should open New Event dialog when clicking "+ New Event"', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -95,11 +113,19 @@ test.describe('Create Event Flow', () => {
   test('should show "Create New Event" button on landing page when no contract', async ({
     page,
     metamask,
+    node,
   }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config without contract address (factory only)
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -129,11 +155,18 @@ test.describe('Create Event Flow', () => {
     await expect(createButton).toBeVisible({ timeout: 15000 });
   });
 
-  test('should create event via factory and navigate to it', async ({ page, metamask }) => {
+  test('should create event via factory and navigate to it', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config without contract address (factory only)
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet (account 0 has ETH from Anvil)
@@ -212,11 +245,18 @@ test.describe('Create Event Flow', () => {
     await expect(page.locator(`text=${eventName}`).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should validate required fields before submitting', async ({ page, metamask }) => {
+  test('should validate required fields before submitting', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -247,11 +287,18 @@ test.describe('Create Event Flow', () => {
     await expect(errorAlert).toBeVisible({ timeout: 5000 });
   });
 
-  test('should close dialog when clicking Cancel', async ({ page, metamask }) => {
+  test('should close dialog when clicking Cancel', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -279,11 +326,19 @@ test.describe('Create Event Flow', () => {
   test('should verify Arweave upload is available when filling metadata fields', async ({
     page,
     metamask,
+    node,
   }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
+
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
 
     // Inject E2E config
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
@@ -347,14 +402,21 @@ test.describe('Create Event Flow', () => {
   });
 
   // This test involves image upload + Arweave + contract creation
-  test('should create event via factory and verify on event page', async ({ page, metamask }) => {
+  test('should create event via factory and verify on event page', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Triple the default timeout for Arweave upload + signature operations
     test.slow();
 
+    // Deploy factory for this test
+    const factoryAddress = await deployFactory({
+      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
+    });
+
     // Inject E2E config without contract address (factory only)
-    await injectE2EConfigFactoryOnly(page);
+    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet (account 0 has ETH from Anvil)

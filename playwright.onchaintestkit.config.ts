@@ -5,21 +5,19 @@
  * Runs headful with xvfb in containers (devcontainer and CI).
  *
  * PARALLELIZATION STRATEGY:
+ * - Each test gets its own Anvil instance via LocalNodeManager
+ * - Dynamic port allocation (8546-9545) prevents conflicts
  * - Tests can run in parallel across spec files
  * - Each test deploys its own contract for full isolation
- * - LocalNodeManager allocates unique ports per worker
- * - Worker count increased from 2 (Synpress) to up to 10
  */
 
 import { defineConfig, devices } from '@playwright/test';
 import os from 'os';
 
-// Parallelize based on CPUs, capped for MetaMask/Anvil stability
-// - Tests within same file run sequentially (fullyParallel: false)
-// - Different spec files run in parallel across workers
-// - IMPORTANT: Using 1 worker to avoid Anvil state conflicts when tests run in parallel
-//   Multiple workers cause "BlockOutOfRangeError" and transaction failures because
-//   parallel tests modify Anvil state while other tests are reading/writing
+// With per-test Anvil instances, we can enable parallel execution
+// Each test gets its own node with dynamic port allocation (8546-9545)
+// Start with 1 worker to verify the per-test Anvil approach works
+// TODO: Increase workers after verifying stability
 const maxWorkers = 1;
 
 export default defineConfig({
@@ -92,7 +90,5 @@ export default defineConfig({
     stderr: 'pipe',
   },
 
-  // Global setup/teardown for Anvil management
-  globalSetup: './src/__tests__/e2e/global-setup.cjs',
-  globalTeardown: './src/__tests__/e2e/global-teardown.cjs',
+  // Note: Global setup/teardown removed - each test manages its own Anvil via LocalNodeManager
 });

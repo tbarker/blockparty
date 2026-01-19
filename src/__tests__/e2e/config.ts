@@ -1,14 +1,16 @@
 /**
  * OnchainTestKit Configuration for BlockParty E2E Tests
  *
- * Configures MetaMask wallet and network settings using OnchainTestKit's
- * fluent builder pattern.
+ * Uses OnchainTestKit's fluent builder pattern with:
+ * - Per-test Anvil instances via LocalNodeManager (enables parallelization)
+ * - MetaMask wallet automation with custom 12.8.1 compatible network setup
  *
- * NOTE: We use the existing global-setup.cjs for Anvil management (proven stable)
- * and OnchainTestKit only for wallet interactions.
+ * NOTE: We use .withLocalNode() for per-test Anvil but NOT .withNetwork()
+ * because OnchainTestKit's addNetwork has MetaMask 12.8.1 compatibility issues.
+ * Network is added via .withCustomSetup() using our custom selectors.
  */
 
-import { configure } from '@coinbase/onchaintestkit';
+import { configure, MetaMaskSpecificActionType } from '@coinbase/onchaintestkit';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,7 +25,7 @@ export const PASSWORD = 'BlockPartyTest123!';
 // Chain ID for local Anvil network
 export const CHAIN_ID = 1337;
 
-// Default Anvil URL and port (shared across workers via global setup)
+// Default Anvil URL and port (fallback for global setup mode)
 export const ANVIL_URL = 'http://localhost:8545';
 export const ANVIL_PORT = 8545;
 
@@ -55,19 +57,33 @@ export function loadE2EState(): E2EState {
 }
 
 /**
- * OnchainTestKit wallet configuration
- * Uses fluent builder pattern to configure MetaMask
+ * OnchainTestKit wallet configuration using fluent builder pattern.
  *
- * NOTE: We don't use .withNetwork() because OnchainTestKit's addNetwork
- * function has compatibility issues with MetaMask 12.8.1's new UI selectors.
- * Instead, we manually add the network in fixtures.ts using custom code.
+ * This configuration:
+ * - Creates a per-test Anvil node via LocalNodeManager (enables parallel tests)
+ * - Configures MetaMask with seed phrase
+ * - Uses custom network setup that's compatible with MetaMask 12.8.1
+ *
+ * NOTE: We use .withLocalNode() for per-test Anvil but NOT .withNetwork()
+ * because OnchainTestKit's addNetwork has MetaMask 12.8.1 compatibility issues.
+ * Network is added in fixtures.ts using custom selectors via addAnvilNetwork().
  */
 export const walletConfig = configure()
+  .withLocalNode({
+    chainId: CHAIN_ID,
+    // Dynamic port allocation - each test gets its own Anvil instance
+    // This enables parallel test execution without state conflicts
+    minPort: 8546,
+    maxPort: 9545,
+  })
   .withMetaMask()
   .withSeedPhrase({
     seedPhrase: SEED_PHRASE,
     password: PASSWORD,
   })
+  // NOTE: We intentionally skip .withNetwork() here because it uses
+  // OnchainTestKit's addNetwork which has MetaMask 12.8.1 compatibility issues.
+  // Network is added manually in fixtures.ts with compatible selectors.
   .build();
 
 /**

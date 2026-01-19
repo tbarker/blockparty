@@ -18,7 +18,7 @@ import {
   ActionApprovalType,
   ANVIL_ACCOUNTS,
   CHAIN_ID,
-  ANVIL_URL,
+  getAnvilUrl,
   deployTestEvent,
   injectE2EConfig,
   waitForAppLoad,
@@ -32,15 +32,17 @@ import { runDiagnostics } from './diagnostics';
 
 test.describe('Withdrawal Flow', () => {
   // Run diagnostics on test failure
-  test.afterEach(async ({}, testInfo) => {
+  test.afterEach(async ({ node }, testInfo) => {
     if (testInfo.status !== 'passed') {
+      const rpcUrl = getAnvilUrl(node);
       console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
-      await runDiagnostics(ANVIL_URL, null, `TEST FAILURE: ${testInfo.title}`);
+      await runDiagnostics(rpcUrl, null, `TEST FAILURE: ${testInfo.title}`);
     }
   });
 
-  test('should allow user to withdraw after attendance and payback', async ({ page, metamask }) => {
+  test('should allow user to withdraw after attendance and payback', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -48,6 +50,7 @@ test.describe('Withdrawal Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -129,8 +132,9 @@ test.describe('Withdrawal Flow', () => {
     }
   });
 
-  test('should show withdraw button only after event ends', async ({ page, metamask }) => {
+  test('should show withdraw button only after event ends', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -138,6 +142,7 @@ test.describe('Withdrawal Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -179,8 +184,9 @@ test.describe('Withdrawal Flow', () => {
     }
   });
 
-  test('should prevent double withdrawal', async ({ page, metamask }) => {
+  test('should prevent double withdrawal', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -188,6 +194,7 @@ test.describe('Withdrawal Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config

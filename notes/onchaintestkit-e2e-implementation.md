@@ -136,6 +136,115 @@ MetaMask only creates one account by default from seed phrase. Tests can't easil
 
 ## Test Status
 
+All 22 E2E tests passing with per-test Anvil instances:
 - `registration.spec.ts`: 5/5 tests passing
 - `attendance.spec.ts`: 6/6 tests passing
-- Total: **11/11 tests passing**
+- `withdrawal.spec.ts`: 3/3 tests passing
+- `createEvent.spec.ts`: 8/8 tests passing
+- Total: **22/22 tests passing** (24.5m, 1 worker)
+
+## Phase 1 Complete: Per-Test Anvil Instances (2026-01-18)
+
+### Implementation
+
+Each test now gets its own isolated Anvil instance via OnchainTestKit's `LocalNodeManager`:
+
+```typescript
+// config.ts
+export const walletConfig = configure()
+  .withLocalNode({
+    chainId: CHAIN_ID,
+    minPort: 8546,
+    maxPort: 9545,  // Dynamic port allocation
+  })
+  .withMetaMask()
+  .withSeedPhrase({ seedPhrase: SEED_PHRASE, password: PASSWORD })
+  // NOTE: Skip .withNetwork() - uses custom addAnvilNetwork() for MetaMask 12.8.1 compatibility
+  .build();
+
+// fixtures.ts - node fixture
+node: [async ({}, use) => {
+  const nodeConfig = walletConfig.nodeConfig;
+  if (nodeConfig) {
+    const node = new LocalNodeManager(nodeConfig);
+    await node.start();
+    await use(node);
+    await node.stop();
+  }
+}, { scope: 'test', auto: true }]
+```
+
+### Benefits
+- Complete test isolation - no shared state between tests
+- Each test deploys its own contracts
+- Enables future parallelization (currently 1 worker for MetaMask 12.8.1 stability)
+- Removed global-setup.cjs - no more shared Anvil instance
+
+### Test Changes
+Each test now:
+1. Gets `node` fixture with per-test Anvil
+2. Uses `getAnvilUrl(node)` to get RPC URL
+3. Deploys contracts to its isolated instance
+
+```typescript
+test('my test', async ({ page, metamask, node }) => {
+  const rpcUrl = getAnvilUrl(node);
+  const contractAddress = await deployTestEvent({
+    privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+    rpcUrl,  // Uses per-test Anvil
+  });
+  // ...
+});
+```
+
+## Network Approval Dialog During Transactions (Added 2026-01-18)
+
+### Problem
+
+When sending transactions to localhost/Anvil networks, MetaMask may show an "Add network" approval dialog with security warnings, even if the network was previously added. This happens because MetaMask detects:
+- Chain ID 1337 (common for local development)
+- RPC URL pointing to localhost
+- Network name/symbol that don't match known providers
+
+The standard `metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {...})` doesn't handle this dialog - it expects a transaction confirmation dialog directly.
+
+### Solution
+
+Added `handleTransactionWithNetworkApproval()` function in `fixtures.ts` that:
+1. First checks for network approval dialogs and clicks "Approve"
+2. Then handles the actual transaction confirmation
+3. Has fallback logic if the standard OnchainTestKit handler fails
+
+```typescript
+export async function handleTransactionWithNetworkApproval(
+  metamask: any,
+  context: any,
+  extensionId: string
+): Promise<void> {
+  // Check for network approval dialog first
+  const networkHandled = await handleNetworkApprovalDialog(context, extensionId, 10);
+  if (networkHandled) {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  // Now handle the actual transaction
+  await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    approvalType: ActionApprovalType.APPROVE,
+  });
+}
+```
+
+### Usage
+
+Tests that need to handle transactions should:
+1. Import `handleTransactionWithNetworkApproval` from fixtures
+2. Add `context` and `extensionId` to the test signature
+3. Replace `metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, ...)` with `handleTransactionWithNetworkApproval(metamask, context, extensionId)`
+
+```typescript
+test('my test', async ({ page, metamask, context, extensionId }) => {
+  // ... click RSVP or other transaction trigger ...
+  await handleTransactionWithNetworkApproval(metamask, context, extensionId);
+  await waitForTransactionSuccess(page);
+});
+```

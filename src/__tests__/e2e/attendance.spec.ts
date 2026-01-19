@@ -18,10 +18,9 @@ import {
   ActionApprovalType,
   ANVIL_ACCOUNTS,
   CHAIN_ID,
-  ANVIL_URL,
+  getAnvilUrl,
   deployTestEvent,
   injectE2EConfig,
-  dismissWelcomeModal,
   waitForAppLoad,
   waitForTransactionSuccess,
   waitForTransactionComplete,
@@ -32,15 +31,17 @@ import { runDiagnostics } from './diagnostics';
 
 test.describe('Admin Attendance Flow', () => {
   // Run diagnostics on test failure
-  test.afterEach(async ({}, testInfo) => {
+  test.afterEach(async ({ node }, testInfo) => {
     if (testInfo.status !== 'passed') {
+      const rpcUrl = getAnvilUrl(node);
       console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
-      await runDiagnostics(ANVIL_URL, null, `TEST FAILURE: ${testInfo.title}`);
+      await runDiagnostics(rpcUrl, null, `TEST FAILURE: ${testInfo.title}`);
     }
   });
 
-  test('should show admin controls when connected as owner', async ({ page, metamask }) => {
+  test('should show admin controls when connected as owner', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test (deployer = admin/owner)
     const contractAddress = await deployTestEvent({
@@ -48,6 +49,7 @@ test.describe('Admin Attendance Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -81,8 +83,9 @@ test.describe('Admin Attendance Flow', () => {
     expect(hasCancelButton || hasPaybackButton || hasGrantAdminButton).toBeTruthy();
   });
 
-  test('should allow admin to mark attendance', async ({ page, metamask }) => {
+  test('should allow admin to mark attendance', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -90,6 +93,7 @@ test.describe('Admin Attendance Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -143,8 +147,9 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should allow admin to trigger payback', async ({ page, metamask }) => {
+  test('should allow admin to trigger payback', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -152,6 +157,7 @@ test.describe('Admin Attendance Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -208,8 +214,9 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should allow admin to cancel event', async ({ page, metamask }) => {
+  test('should allow admin to cancel event', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -217,6 +224,7 @@ test.describe('Admin Attendance Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -237,8 +245,9 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should load event page for any connected user', async ({ page, metamask }) => {
+  test('should load event page for any connected user', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -246,6 +255,7 @@ test.describe('Admin Attendance Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config
@@ -273,8 +283,9 @@ test.describe('Admin Attendance Flow', () => {
     // the UI shows all actions, but transactions will fail for non-admins.
   });
 
-  test('should update attended count after marking attendance', async ({ page, metamask }) => {
+  test('should update attended count after marking attendance', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -282,6 +293,7 @@ test.describe('Admin Attendance Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
     // Inject E2E config

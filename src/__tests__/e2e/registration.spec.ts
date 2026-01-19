@@ -9,8 +9,8 @@
  * 5. Transaction is mined on Anvil
  * 6. UI updates to show registration status
  *
- * Uses OnchainTestKit for wallet interactions with shared Anvil instance
- * from global-setup.cjs. Each test deploys its own contract for isolation.
+ * Phase 1: Uses createOnchainTest with per-test Anvil instances.
+ * Each test gets its own Anvil node via LocalNodeManager.
  */
 
 import {
@@ -20,29 +20,30 @@ import {
   ActionApprovalType,
   ANVIL_ACCOUNTS,
   CHAIN_ID,
-  ANVIL_URL,
+  getAnvilUrl,
   deployTestEvent,
   injectE2EConfig,
-  dismissWelcomeModal,
   dismissRainbowKitPopovers,
   waitForAppLoad,
   waitForTransactionSuccess,
   waitForTransactionComplete,
-  handleMetaMaskConnection,
+  connectWallet,
 } from './fixtures';
 import { runDiagnostics } from './diagnostics';
 
 test.describe('Registration Flow', () => {
   // Run diagnostics on test failure
-  test.afterEach(async ({ context }, testInfo) => {
+  test.afterEach(async ({ context, node }, testInfo) => {
     if (testInfo.status !== 'passed') {
       console.log(`\n[${testInfo.title}] Test ${testInfo.status} - running diagnostics...`);
-      await runDiagnostics(ANVIL_URL, context, `TEST FAILURE: ${testInfo.title}`);
+      const rpcUrl = getAnvilUrl(node);
+      await runDiagnostics(rpcUrl, context, `TEST FAILURE: ${testInfo.title}`);
     }
   });
 
-  test('should display event details on page load', async ({ page, metamask, context, extensionId }) => {
+  test('should display event details on page load', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
     const contractAddress = await deployTestEvent({
@@ -50,23 +51,15 @@ test.describe('Registration Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
-    // Inject E2E config
+    // Inject E2E config and navigate
     await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
-    // Connect wallet via RainbowKit
-    await page.locator('button:has-text("Connect Wallet")').click();
-    await page
-      .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
-      .first()
-      .click();
-
-    // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
-    await handleMetaMaskConnection(context, extensionId);
-
-    // Wait for app to load
+    // Connect wallet
+    await connectWallet(page, metamask);
     await waitForAppLoad(page);
 
     // Verify event info section is visible
@@ -79,8 +72,9 @@ test.describe('Registration Flow', () => {
     await expect(page.getByText('Going (spots left)')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show connected account in RainbowKit button', async ({ page, metamask, context, extensionId }) => {
+  test('should show connected account in RainbowKit button', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
     const contractAddress = await deployTestEvent({
@@ -88,20 +82,15 @@ test.describe('Registration Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
-    // Inject E2E config
+    // Inject E2E config and navigate
     await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await page.locator('button:has-text("Connect Wallet")').click();
-    await page
-      .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
-      .first()
-      .click();
-    // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
-    await handleMetaMaskConnection(context, extensionId);
+    await connectWallet(page, metamask);
 
     // Wait for RainbowKit account button
     const accountButton = page.locator(
@@ -114,8 +103,9 @@ test.describe('Registration Flow', () => {
     expect(buttonText).toMatch(/0x[a-fA-F0-9]/);
   });
 
-  test('should allow user to register for event', async ({ page, metamask, context, extensionId }) => {
+  test('should allow user to register for event', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
     const contractAddress = await deployTestEvent({
@@ -123,28 +113,19 @@ test.describe('Registration Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
-    // Inject E2E config
+    // Inject E2E config and navigate
     await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await page.locator('button:has-text("Connect Wallet")').click();
-    await page
-      .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
-      .first()
-      .click();
-    // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
-    await handleMetaMaskConnection(context, extensionId);
-
+    await connectWallet(page, metamask);
     await waitForAppLoad(page);
 
-    // Enter Twitter handle
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill('@onchain_usr');
-
-    // Click RSVP button
+    // Enter Twitter handle and RSVP
+    await page.locator('input[placeholder*="twitter"]').fill('@onchain_usr');
     const rsvpButton = page.locator('button:has-text("RSVP")');
     await expect(rsvpButton).toBeEnabled();
     await rsvpButton.click();
@@ -164,8 +145,9 @@ test.describe('Registration Flow', () => {
     await expect(rsvpButton).toBeDisabled();
   });
 
-  test('should update participant count after registration', async ({ page, metamask, context, extensionId }) => {
+  test('should update participant count after registration', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
     const contractAddress = await deployTestEvent({
@@ -173,21 +155,15 @@ test.describe('Registration Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
-    // Inject E2E config
+    // Inject E2E config and navigate
     await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await page.locator('button:has-text("Connect Wallet")').click();
-    await page
-      .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
-      .first()
-      .click();
-    // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
-    await handleMetaMaskConnection(context, extensionId);
-
+    await connectWallet(page, metamask);
     await waitForAppLoad(page);
 
     // Enter Twitter handle
@@ -214,8 +190,9 @@ test.describe('Registration Flow', () => {
     await expect(page.locator('text=/\\d+\\(\\d+\\)/')).toBeVisible({ timeout: 5000 });
   });
 
-  test('should display participants table with registration data', async ({ page, metamask, context, extensionId }) => {
+  test('should display participants table with registration data', async ({ page, metamask, node }) => {
     if (!metamask) throw new Error('MetaMask fixture required');
+    const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
     const contractAddress = await deployTestEvent({
@@ -223,21 +200,15 @@ test.describe('Registration Flow', () => {
       deposit: '0.02',
       maxParticipants: 20,
       privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
+      rpcUrl,
     });
 
-    // Inject E2E config
+    // Inject E2E config and navigate
     await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await page.locator('button:has-text("Connect Wallet")').click();
-    await page
-      .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
-      .first()
-      .click();
-    // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
-    await handleMetaMaskConnection(context, extensionId);
-
+    await connectWallet(page, metamask);
     await waitForAppLoad(page);
     await dismissRainbowKitPopovers(page);
 

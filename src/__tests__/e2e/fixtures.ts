@@ -2,16 +2,17 @@
  * OnchainTestKit Test Fixtures for BlockParty E2E Tests
  *
  * Provides test fixtures that integrate:
- * - OnchainTestKit for MetaMask wallet interactions
+ * - OnchainTestKit for MetaMask or Coinbase Wallet interactions (configurable)
  * - Per-test Anvil instances via LocalNodeManager (enables parallelization)
  * - Contract deployment helpers
- * - App-specific UI helpers (MetaMask 12.8.1 compatible)
+ * - App-specific UI helpers
  */
 
 import { test as base, expect } from '@playwright/test';
-import { MetaMask, BaseActionType, ActionApprovalType, setupRpcPortInterceptor } from '@coinbase/onchaintestkit';
+import { MetaMask, CoinbaseWallet, BaseActionType, ActionApprovalType, setupRpcPortInterceptor } from '@coinbase/onchaintestkit';
 import {
   walletConfig,
+  WALLET_TYPE,
   ANVIL_ACCOUNTS,
   CHAIN_ID,
   ANVIL_URL,
@@ -20,6 +21,9 @@ import {
 import { checkAnvilHealth, runDiagnostics, waitForAnvil } from './diagnostics';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Unified wallet type that can be either MetaMask or CoinbaseWallet
+export type Wallet = MetaMask | CoinbaseWallet;
 
 // Use direct paths to avoid package.json exports resolution issues
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -33,10 +37,10 @@ const { LocalNodeManager } = require(path.join(onchaintkitPath, 'node', 'LocalNo
 // Re-export for convenience
 export { expect, BaseActionType, ActionApprovalType };
 export { checkAnvilHealth, runDiagnostics, waitForAnvil } from './diagnostics';
-export { ANVIL_ACCOUNTS, CHAIN_ID, ANVIL_URL, ANVIL_PORT } from './config';
+export { ANVIL_ACCOUNTS, CHAIN_ID, ANVIL_URL, ANVIL_PORT, WALLET_TYPE } from './config';
 
-// Shared MetaMask state across tests in the same worker
-let sharedMetamaskPage: any;
+// Shared wallet state across tests in the same worker
+let sharedWalletPage: any;
 let sharedExtensionId: string;
 let networkAlreadyAdded = false;
 let currentNetworkPort: number | null = null;
@@ -60,14 +64,14 @@ export function getAnvilUrl(node: any): string {
  *
  * OPTIMIZATION: Skips if network was already added with the same port in this worker.
  */
-async function addAnvilNetwork(metamaskPage: any, rpcUrl: string = ANVIL_URL): Promise<void> {
+async function addAnvilNetworkMetaMask(walletPage: any, rpcUrl: string = ANVIL_URL): Promise<void> {
   // Extract port from RPC URL
   const portMatch = rpcUrl.match(/:(\d+)$/);
   const port = portMatch ? parseInt(portMatch[1], 10) : ANVIL_PORT;
 
   // Skip if already added with the same port in this worker session
   if (networkAlreadyAdded && currentNetworkPort === port) {
-    console.log('[addAnvilNetwork] Network already added, skipping');
+    console.log('[addAnvilNetworkMetaMask] Network already added, skipping');
     return;
   }
 
@@ -75,103 +79,195 @@ async function addAnvilNetwork(metamaskPage: any, rpcUrl: string = ANVIL_URL): P
   const chainId = CHAIN_ID.toString();
   const symbol = 'ETH';
 
-  console.log(`[addAnvilNetwork] Adding network "${networkName}" with RPC URL: ${rpcUrl}`);
+  console.log(`[addAnvilNetworkMetaMask] Adding network "${networkName}" with RPC URL: ${rpcUrl}`);
 
   try {
     // Click the network selector dropdown
-    await metamaskPage.locator('[data-testid="network-display"]').click();
-    await metamaskPage.waitForTimeout(200);
+    await walletPage.locator('[data-testid="network-display"]').click();
+    await walletPage.waitForTimeout(200);
 
     // Check if Localhost network already exists
-    const localhostOption = metamaskPage.locator('button:has-text("Localhost"), [data-testid="Localhost"]').first();
+    const localhostOption = walletPage.locator('button:has-text("Localhost"), [data-testid="Localhost"]').first();
     if (await localhostOption.isVisible({ timeout: 1000 }).catch(() => false)) {
-      console.log('[addAnvilNetwork] Localhost network already exists, selecting it');
+      console.log('[addAnvilNetworkMetaMask] Localhost network already exists, selecting it');
       await localhostOption.click();
       networkAlreadyAdded = true;
       return;
     }
 
     // Click "Add a custom network" button
-    const addNetworkButton = metamaskPage.getByRole('button', { name: 'Add a custom network' });
+    const addNetworkButton = walletPage.getByRole('button', { name: 'Add a custom network' });
     await addNetworkButton.waitFor({ state: 'visible', timeout: 5000 });
     await addNetworkButton.click();
-    await metamaskPage.waitForTimeout(200);
+    await walletPage.waitForTimeout(200);
 
     // Fill network name - try multiple selectors for MetaMask 12.8.1 compatibility
-    const networkNameInput = metamaskPage.locator('input[placeholder="Enter network name"], #networkName, input[name="networkName"]').first();
+    const networkNameInput = walletPage.locator('input[placeholder="Enter network name"], #networkName, input[name="networkName"]').first();
     await networkNameInput.waitFor({ state: 'visible', timeout: 5000 });
     await networkNameInput.clear();
     await networkNameInput.fill(networkName);
 
     // Fill chain ID
-    const chainIdInput = metamaskPage.locator('#chainId, input[name="chainId"]').first();
+    const chainIdInput = walletPage.locator('#chainId, input[name="chainId"]').first();
     await chainIdInput.waitFor({ state: 'visible', timeout: 5000 });
     await chainIdInput.clear();
     await chainIdInput.fill(chainId);
 
     // Fill currency symbol
-    const symbolInput = metamaskPage.locator('#nativeCurrency, input[name="nativeCurrency"]').first();
+    const symbolInput = walletPage.locator('#nativeCurrency, input[name="nativeCurrency"]').first();
     await symbolInput.waitFor({ state: 'visible', timeout: 5000 });
     await symbolInput.clear();
     await symbolInput.fill(symbol);
 
     // Add RPC URL - click the dropdown first
-    const rpcDropdown = metamaskPage.getByLabel('Default RPC URL');
+    const rpcDropdown = walletPage.getByLabel('Default RPC URL');
     await rpcDropdown.click();
-    await metamaskPage.waitForTimeout(200);
+    await walletPage.waitForTimeout(200);
 
     // Click "Add RPC URL" button
-    const addRpcButton = metamaskPage.getByRole('button', { name: 'Add RPC URL' });
+    const addRpcButton = walletPage.getByRole('button', { name: 'Add RPC URL' });
     await addRpcButton.waitFor({ state: 'visible', timeout: 5000 });
     await addRpcButton.click();
-    await metamaskPage.waitForTimeout(200);
+    await walletPage.waitForTimeout(200);
 
     // Fill RPC URL
-    const rpcUrlInput = metamaskPage.locator('#rpcUrl, input[name="rpcUrl"]').first();
+    const rpcUrlInput = walletPage.locator('#rpcUrl, input[name="rpcUrl"]').first();
     await rpcUrlInput.waitFor({ state: 'visible', timeout: 5000 });
     await rpcUrlInput.fill(rpcUrl);
 
     // Fill RPC name
-    const rpcNameInput = metamaskPage.locator('#rpcName, input[name="rpcName"]').first();
+    const rpcNameInput = walletPage.locator('#rpcName, input[name="rpcName"]').first();
     await rpcNameInput.waitFor({ state: 'visible', timeout: 5000 });
     await rpcNameInput.fill(networkName);
 
     // Click "Add URL" button
-    const addUrlButton = metamaskPage.getByRole('button', { name: 'Add URL' });
+    const addUrlButton = walletPage.getByRole('button', { name: 'Add URL' });
     await addUrlButton.waitFor({ state: 'visible', timeout: 5000 });
     await addUrlButton.click();
-    await metamaskPage.waitForTimeout(300);
+    await walletPage.waitForTimeout(300);
 
     // Click "Save" button
-    const saveButton = metamaskPage.getByRole('button', { name: 'Save' });
+    const saveButton = walletPage.getByRole('button', { name: 'Save' });
     await saveButton.waitFor({ state: 'visible', timeout: 5000 });
     // Wait for save button to be enabled (network name must be filled)
-    await metamaskPage.waitForFunction(() => {
+    await walletPage.waitForFunction(() => {
       const btn = document.querySelector('button[type="button"]');
       return btn && !btn.hasAttribute('disabled') && btn.textContent?.includes('Save');
     }, { timeout: 5000 }).catch(() => {});
     await saveButton.click();
-    await metamaskPage.waitForTimeout(500);
+    await walletPage.waitForTimeout(500);
 
     // Handle "network added" popup if it appears
-    const gotItButton = metamaskPage.getByRole('button', { name: 'Got it' });
+    const gotItButton = walletPage.getByRole('button', { name: 'Got it' });
     if (await gotItButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await gotItButton.click();
-      await metamaskPage.waitForTimeout(200);
+      await walletPage.waitForTimeout(200);
     }
 
     // Handle network info popup if it appears
-    const dismissButton = metamaskPage.locator('button:has-text("Dismiss"), button:has-text("Close")').first();
+    const dismissButton = walletPage.locator('button:has-text("Dismiss"), button:has-text("Close")').first();
     if (await dismissButton.isVisible({ timeout: 1000 }).catch(() => false)) {
       await dismissButton.click();
     }
 
     networkAlreadyAdded = true;
     currentNetworkPort = port;
-    console.log(`[addAnvilNetwork] Network "${networkName}" added successfully`);
+    console.log(`[addAnvilNetworkMetaMask] Network "${networkName}" added successfully`);
   } catch (error) {
-    console.error('[addAnvilNetwork] Error adding network:', error);
+    console.error('[addAnvilNetworkMetaMask] Error adding network:', error);
     throw error;
+  }
+}
+
+/**
+ * Add Anvil network to Coinbase Wallet.
+ *
+ * Coinbase Wallet has a different UI for network management.
+ * OPTIMIZATION: Skips if network was already added with the same port in this worker.
+ */
+async function addAnvilNetworkCoinbase(walletPage: any, rpcUrl: string = ANVIL_URL): Promise<void> {
+  // Extract port from RPC URL
+  const portMatch = rpcUrl.match(/:(\d+)$/);
+  const port = portMatch ? parseInt(portMatch[1], 10) : ANVIL_PORT;
+
+  // Skip if already added with the same port in this worker session
+  if (networkAlreadyAdded && currentNetworkPort === port) {
+    console.log('[addAnvilNetworkCoinbase] Network already added, skipping');
+    return;
+  }
+
+  const networkName = 'Localhost';
+  const chainId = CHAIN_ID.toString();
+
+  console.log(`[addAnvilNetworkCoinbase] Adding network "${networkName}" with RPC URL: ${rpcUrl}`);
+
+  try {
+    // Coinbase Wallet uses Settings > Networks for custom network management
+    // Click the settings/menu button
+    const settingsButton = walletPage.locator('[data-testid="settings-button"], button[aria-label="Settings"], button:has-text("Settings")').first();
+    if (await settingsButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await settingsButton.click();
+      await walletPage.waitForTimeout(300);
+    }
+
+    // Look for Networks option
+    const networksOption = walletPage.locator('button:has-text("Networks"), [data-testid="networks-option"]').first();
+    if (await networksOption.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await networksOption.click();
+      await walletPage.waitForTimeout(300);
+    }
+
+    // Check if Localhost network already exists
+    const localhostOption = walletPage.locator(`button:has-text("${networkName}"), [data-testid="${networkName}"]`).first();
+    if (await localhostOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+      console.log('[addAnvilNetworkCoinbase] Localhost network already exists, selecting it');
+      await localhostOption.click();
+      networkAlreadyAdded = true;
+      currentNetworkPort = port;
+      return;
+    }
+
+    // Click "Add Network" button
+    const addNetworkButton = walletPage.locator('button:has-text("Add Network"), button:has-text("Add network")').first();
+    if (await addNetworkButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await addNetworkButton.click();
+      await walletPage.waitForTimeout(300);
+    }
+
+    // Fill network details - Coinbase Wallet UI
+    const nameInput = walletPage.locator('input[placeholder*="name"], input[name="name"]').first();
+    if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await nameInput.fill(networkName);
+    }
+
+    const rpcInput = walletPage.locator('input[placeholder*="RPC"], input[name="rpcUrl"]').first();
+    if (await rpcInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await rpcInput.fill(rpcUrl);
+    }
+
+    const chainIdInput = walletPage.locator('input[placeholder*="Chain"], input[name="chainId"]').first();
+    if (await chainIdInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await chainIdInput.fill(chainId);
+    }
+
+    const symbolInput = walletPage.locator('input[placeholder*="Symbol"], input[name="symbol"]').first();
+    if (await symbolInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await symbolInput.fill('ETH');
+    }
+
+    // Save the network
+    const saveButton = walletPage.locator('button:has-text("Save"), button:has-text("Add")').first();
+    if (await saveButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await saveButton.click();
+      await walletPage.waitForTimeout(500);
+    }
+
+    networkAlreadyAdded = true;
+    currentNetworkPort = port;
+    console.log(`[addAnvilNetworkCoinbase] Network "${networkName}" added successfully`);
+  } catch (error) {
+    console.error('[addAnvilNetworkCoinbase] Error adding network:', error);
+    // Don't throw - Coinbase Wallet might handle networks differently
   }
 }
 
@@ -179,48 +275,77 @@ async function addAnvilNetwork(metamaskPage: any, rpcUrl: string = ANVIL_URL): P
  * Switch MetaMask to the Localhost network.
  * OPTIMIZATION: Reduced waits and check if already on correct network.
  */
-async function switchToLocalhostNetwork(metamaskPage: any): Promise<void> {
-  console.log('[switchToLocalhostNetwork] Switching to Localhost network');
+async function switchToLocalhostNetworkMetaMask(walletPage: any): Promise<void> {
+  console.log('[switchToLocalhostNetworkMetaMask] Switching to Localhost network');
 
   try {
     // Check if already on Localhost network
-    const networkDisplay = metamaskPage.locator('[data-testid="network-display"]');
+    const networkDisplay = walletPage.locator('[data-testid="network-display"]');
     const currentNetwork = await networkDisplay.textContent().catch(() => '');
     if (currentNetwork?.includes('Localhost')) {
-      console.log('[switchToLocalhostNetwork] Already on Localhost network');
+      console.log('[switchToLocalhostNetworkMetaMask] Already on Localhost network');
       return;
     }
 
     // Click the network selector dropdown
     await networkDisplay.click();
-    await metamaskPage.waitForTimeout(200);
+    await walletPage.waitForTimeout(200);
 
     // Look for Localhost network in the list
-    const localhostOption = metamaskPage.locator('button:has-text("Localhost"), [data-testid="Localhost"]').first();
+    const localhostOption = walletPage.locator('button:has-text("Localhost"), [data-testid="Localhost"]').first();
     if (await localhostOption.isVisible({ timeout: 2000 }).catch(() => false)) {
       await localhostOption.click();
-      console.log('[switchToLocalhostNetwork] Switched to Localhost network');
+      console.log('[switchToLocalhostNetworkMetaMask] Switched to Localhost network');
       return;
     }
 
     // If not found, close the dropdown and the network might already be selected
-    await metamaskPage.keyboard.press('Escape');
-    console.log('[switchToLocalhostNetwork] Localhost network not found in list, may already be selected');
+    await walletPage.keyboard.press('Escape');
+    console.log('[switchToLocalhostNetworkMetaMask] Localhost network not found in list, may already be selected');
   } catch (error) {
-    console.error('[switchToLocalhostNetwork] Error switching network:', error);
+    console.error('[switchToLocalhostNetworkMetaMask] Error switching network:', error);
     // Don't throw - the network might already be selected
+  }
+}
+
+/**
+ * Add Anvil network to the wallet (MetaMask or Coinbase).
+ * Delegates to the appropriate wallet-specific function.
+ */
+async function addAnvilNetwork(walletPage: any, rpcUrl: string = ANVIL_URL): Promise<void> {
+  if (WALLET_TYPE === 'coinbase') {
+    await addAnvilNetworkCoinbase(walletPage, rpcUrl);
+  } else {
+    await addAnvilNetworkMetaMask(walletPage, rpcUrl);
+  }
+}
+
+/**
+ * Switch to the Localhost network in the wallet.
+ * Delegates to the appropriate wallet-specific function.
+ */
+async function switchToLocalhostNetwork(walletPage: any): Promise<void> {
+  if (WALLET_TYPE === 'coinbase') {
+    // Coinbase Wallet typically switches network as part of addAnvilNetwork
+    console.log('[switchToLocalhostNetwork] Coinbase Wallet - network switch handled in addAnvilNetwork');
+  } else {
+    await switchToLocalhostNetworkMetaMask(walletPage);
   }
 }
 
 /**
  * Custom test fixtures for OnchainTestKit with per-test Anvil instances.
  * Uses LocalNodeManager for parallel test execution support.
+ * Supports both MetaMask and Coinbase Wallet via WALLET_TYPE env var.
  */
 export const test = base.extend<{
   node: any;
+  wallet: Wallet | null;
+  walletPage: any;
+  extensionId: string;
+  // Keep metamask for backward compatibility
   metamask: MetaMask | null;
   metamaskPage: any;
-  extensionId: string;
 }>({
   // Per-test Anvil instance via LocalNodeManager
   node: [async ({}, use) => {
@@ -246,43 +371,72 @@ export const test = base.extend<{
     if (error) console.error(error);
   }, { scope: 'test' }],
 
-  // Initialize MetaMask context with RPC interception for dynamic port
+  // Initialize wallet context with RPC interception for dynamic port
   context: async ({ context: currentContext, _contextPath, node }: any, use: any) => {
     try {
-      // Extract the metamask-specific config for initialization
-      const mmConfig = walletConfig.wallets?.metamask;
-      if (!mmConfig) {
-        throw new Error('MetaMask config not found in walletConfig');
-      }
-
-      const { metamaskContext, metamaskPage } = await MetaMask.initialize(
-        currentContext,
-        _contextPath,
-        mmConfig
-      );
-      sharedMetamaskPage = metamaskPage;
-
-      // Set up RPC interceptor for the per-test Anvil instance
       const port = node?.port || ANVIL_PORT;
-      await setupRpcPortInterceptor(metamaskContext, port);
 
-      await use(metamaskContext);
-      await metamaskContext.close();
+      if (WALLET_TYPE === 'coinbase') {
+        // Initialize Coinbase Wallet
+        const cbConfig = walletConfig.wallets?.coinbase;
+        if (!cbConfig) {
+          throw new Error('Coinbase config not found in walletConfig');
+        }
+
+        const { coinbaseContext, coinbasePage } = await CoinbaseWallet.initialize(
+          currentContext,
+          _contextPath,
+          cbConfig
+        );
+        sharedWalletPage = coinbasePage;
+
+        // Set up RPC interceptor for the per-test Anvil instance
+        await setupRpcPortInterceptor(coinbaseContext, port);
+
+        await use(coinbaseContext);
+        await coinbaseContext.close();
+      } else {
+        // Initialize MetaMask (default)
+        const mmConfig = walletConfig.wallets?.metamask;
+        if (!mmConfig) {
+          throw new Error('MetaMask config not found in walletConfig');
+        }
+
+        const { metamaskContext, metamaskPage } = await MetaMask.initialize(
+          currentContext,
+          _contextPath,
+          mmConfig
+        );
+        sharedWalletPage = metamaskPage;
+
+        // Set up RPC interceptor for the per-test Anvil instance
+        await setupRpcPortInterceptor(metamaskContext, port);
+
+        await use(metamaskContext);
+        await metamaskContext.close();
+      }
     } catch (error) {
       console.error('Error in context fixture:', error);
       throw error;
     }
   },
 
-  // Expose MetaMask page
+  // Expose wallet page (unified)
+  walletPage: async ({ context: _ }: any, use: any) => {
+    await use(sharedWalletPage);
+  },
+
+  // Expose MetaMask page (backward compatibility)
   metamaskPage: async ({ context: _ }: any, use: any) => {
-    await use(sharedMetamaskPage);
+    await use(sharedWalletPage);
   },
 
   // Get extension ID
   extensionId: async ({ context }: any, use: any) => {
     try {
-      const extensionId = await getExtensionId(context, 'MetaMask');
+      const extensionName = WALLET_TYPE === 'coinbase' ? 'Coinbase Wallet' : 'MetaMask';
+      const extensionId = await getExtensionId(context, extensionName);
+      sharedExtensionId = extensionId;
       await use(extensionId);
     } catch (error) {
       console.error('Error in extensionId fixture:', error);
@@ -290,37 +444,61 @@ export const test = base.extend<{
     }
   },
 
-  // Create MetaMask wrapper with per-test Anvil configuration
-  metamask: [async ({ context, extensionId, node }: any, use: any) => {
+  // Create unified wallet wrapper with per-test Anvil configuration
+  wallet: [async ({ context, extensionId, node }: any, use: any) => {
     try {
-      // Extract the metamask-specific config from the built config
-      const mmConfig = walletConfig.wallets?.metamask;
-      if (!mmConfig) {
-        throw new Error('MetaMask config not found in walletConfig');
-      }
-
       const port = node?.port || ANVIL_PORT;
-      const rpcUrl = node?.rpcUrl || ANVIL_URL;
+      const rpcUrl = `http://localhost:${port}`;
 
-      const metamask = new MetaMask(mmConfig, context, sharedMetamaskPage, extensionId);
+      let wallet: Wallet;
 
-      // Run wallet setup manually (seed phrase import only, no network setup)
-      if (mmConfig.walletSetup) {
-        await mmConfig.walletSetup(metamask, { localNodePort: port });
+      if (WALLET_TYPE === 'coinbase') {
+        // Initialize Coinbase Wallet
+        const cbConfig = walletConfig.wallets?.coinbase;
+        if (!cbConfig) {
+          throw new Error('Coinbase config not found in walletConfig');
+        }
+
+        wallet = new CoinbaseWallet(cbConfig, context, sharedWalletPage, extensionId);
+
+        // Run wallet setup manually
+        if (cbConfig.walletSetup) {
+          await cbConfig.walletSetup(wallet, { localNodePort: port });
+        }
+      } else {
+        // Initialize MetaMask (default)
+        const mmConfig = walletConfig.wallets?.metamask;
+        if (!mmConfig) {
+          throw new Error('MetaMask config not found in walletConfig');
+        }
+
+        wallet = new MetaMask(mmConfig, context, sharedWalletPage, extensionId);
+
+        // Run wallet setup manually (seed phrase import only, no network setup)
+        if (mmConfig.walletSetup) {
+          await mmConfig.walletSetup(wallet, { localNodePort: port });
+        }
       }
 
-      // Add Anvil network using our custom function (MetaMask 12.8.1 compatible)
-      await addAnvilNetwork(sharedMetamaskPage, rpcUrl);
+      // Add Anvil network using the appropriate wallet-specific function
+      await addAnvilNetwork(sharedWalletPage, rpcUrl);
 
       // Switch to the Localhost network
-      await switchToLocalhostNetwork(sharedMetamaskPage);
+      await switchToLocalhostNetwork(sharedWalletPage);
 
-      await use(metamask);
+      await use(wallet);
     } catch (error) {
-      console.error('Error in metamask fixture:', error);
+      console.error('Error in wallet fixture:', error);
       throw error;
     }
   }, { scope: 'test', auto: true }],
+
+  // Keep metamask fixture for backward compatibility (aliases wallet)
+  metamask: [async ({ wallet }: any, use: any) => {
+    // For backward compatibility, metamask fixture returns the wallet
+    // This works because both MetaMask and CoinbaseWallet implement handleAction
+    await use(wallet as MetaMask);
+  }, { scope: 'test' }],
 });
 
 /**
@@ -640,6 +818,9 @@ export async function waitForTransactionComplete(
  * Switch MetaMask account by index.
  * OnchainTestKit uses the same seed phrase, so accounts match Anvil accounts.
  * Account 0 = deployer, Account 1 = user1, etc.
+ *
+ * Note: After switching accounts, the network may reset. This function
+ * also ensures the Localhost network is selected after the switch.
  */
 export async function switchMetaMaskAccount(
   metamask: any,
@@ -673,6 +854,10 @@ export async function switchMetaMaskAccount(
         await metamaskPage.locator(`text="${accountName}"`).click();
       }
       await metamaskPage.waitForTimeout(500);
+
+      // After switching accounts, ensure we're on the Localhost network
+      // (MetaMask may reset to Mainnet when switching accounts)
+      await switchToLocalhostNetworkMetaMask(metamaskPage);
     }
   }
 }
@@ -764,33 +949,119 @@ export async function handleMetaMaskConnection(context: any, extensionId: string
 }
 
 /**
- * Connect wallet via RainbowKit and MetaMask.
- * Handles the full MetaMask 12.x two-step connection flow.
+ * Handle Coinbase Wallet connection flow.
+ *
+ * Coinbase Wallet typically has a simpler connection flow with a single popup.
+ */
+export async function handleCoinbaseConnection(context: any, extensionId: string): Promise<void> {
+  const maxAttempts = 30;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Wait a moment between attempts
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Find all pages and look for Coinbase Wallet popup pages
+    const pages = context.pages();
+
+    for (const popupPage of pages) {
+      try {
+        const url = popupPage.url();
+
+        // Coinbase Wallet popup pages contain the extension ID
+        if (url.includes(extensionId)) {
+          console.log(`[handleCoinbaseConnection] Attempt ${attempt + 1}, found popup page:`, url);
+
+          // Look for Connect/Approve buttons in Coinbase Wallet UI
+          const connectSelectors = [
+            popupPage.getByRole('button', { name: 'Connect' }),
+            popupPage.getByRole('button', { name: 'Approve' }),
+            popupPage.getByRole('button', { name: 'Allow' }),
+            popupPage.locator('button[data-testid="allow-authorize-button"]'),
+            popupPage.locator('button:has-text("Connect")'),
+          ];
+
+          for (const button of connectSelectors) {
+            const isVisible = await button.isVisible({ timeout: 500 }).catch(() => false);
+            if (isVisible) {
+              console.log('[handleCoinbaseConnection] Found connect button, clicking');
+              await button.click();
+
+              // Wait for the popup to close or transition
+              await popupPage.waitForEvent('close', { timeout: 5000 }).catch(() => {});
+              console.log('[handleCoinbaseConnection] Connection complete');
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        // Continue checking other pages
+      }
+    }
+  }
+
+  console.log('[handleCoinbaseConnection] No popup dialog found after all attempts');
+}
+
+/**
+ * Handle wallet connection flow (MetaMask or Coinbase).
+ * Delegates to the appropriate wallet-specific handler.
+ */
+export async function handleWalletConnection(context: any, extensionId: string): Promise<void> {
+  if (WALLET_TYPE === 'coinbase') {
+    await handleCoinbaseConnection(context, extensionId);
+  } else {
+    await handleMetaMaskConnection(context, extensionId);
+  }
+}
+
+/**
+ * Switch wallet account by index.
+ * OnchainTestKit uses the same seed phrase, so accounts match Anvil accounts.
+ * Account 0 = deployer, Account 1 = user1, etc.
+ */
+export async function switchWalletAccount(
+  wallet: Wallet,
+  accountIndex: number
+): Promise<void> {
+  console.log(`[switchWalletAccount] Switching to account ${accountIndex}`);
+
+  // Both MetaMask and CoinbaseWallet should have switchAccount method
+  if (typeof (wallet as any).switchAccount === 'function') {
+    await (wallet as any).switchAccount(accountIndex);
+  } else {
+    // Fallback: delegate to MetaMask-specific handler (works for MetaMask)
+    await switchMetaMaskAccount(wallet, accountIndex);
+  }
+}
+
+/**
+ * Connect wallet via RainbowKit.
+ * Handles both MetaMask and Coinbase Wallet connection flows.
  *
  * @param page - Playwright page
- * @param metamask - MetaMask instance from OnchainTestKit
+ * @param wallet - Wallet instance (MetaMask or CoinbaseWallet) from OnchainTestKit
  * @param options - Optional: { accountIndex } to switch accounts before connecting
  */
 export async function connectWallet(
   page: any,
-  metamask: any,
+  wallet: any,
   options?: {
     accountIndex?: number;
   }
 ): Promise<void> {
   const accountIndex = options?.accountIndex ?? 0;
 
-  // Get context and extensionId from metamask
-  const context = metamask.context;
-  const extensionId = metamask.extensionId;
+  // Get context and extensionId from wallet
+  const context = wallet.context;
+  const extensionId = wallet.extensionId;
 
   if (!context || !extensionId) {
-    throw new Error('MetaMask context or extensionId not available. Ensure metamask fixture is properly initialized.');
+    throw new Error('Wallet context or extensionId not available. Ensure wallet fixture is properly initialized.');
   }
 
   // Switch to desired account first if not default
   if (accountIndex !== 0) {
-    await switchMetaMaskAccount(metamask, accountIndex);
+    await switchWalletAccount(wallet, accountIndex);
   }
 
   // Click Connect Wallet button
@@ -798,14 +1069,25 @@ export async function connectWallet(
   if (await connectButton.isVisible({ timeout: 5000 }).catch(() => false)) {
     await connectButton.click();
 
-    // Click MetaMask option in RainbowKit modal
-    await page
-      .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
-      .first()
-      .click();
+    if (WALLET_TYPE === 'coinbase') {
+      // Click Coinbase Wallet option in RainbowKit modal
+      await page
+        .locator('button:has-text("Coinbase Wallet"), [data-testid="rk-wallet-option-coinbase"]')
+        .first()
+        .click();
 
-    // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
-    await handleMetaMaskConnection(context, extensionId);
+      // Handle Coinbase Wallet connection flow
+      await handleCoinbaseConnection(context, extensionId);
+    } else {
+      // Click MetaMask option in RainbowKit modal (default)
+      await page
+        .locator('button:has-text("MetaMask"), [data-testid="rk-wallet-option-metaMask"]')
+        .first()
+        .click();
+
+      // Handle MetaMask 12.x two-step connection flow (Connect + Review permissions)
+      await handleMetaMaskConnection(context, extensionId);
+    }
   }
 }
 

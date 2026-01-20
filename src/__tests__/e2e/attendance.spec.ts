@@ -1,13 +1,14 @@
 /**
  * Admin Attendance Flow E2E Tests (OnchainTestKit)
  *
- * Tests admin functionality with real MetaMask:
+ * Tests admin functionality with wallet automation:
  * 1. Admin views registered participants
  * 2. Admin marks attendees as present
  * 3. Admin triggers payback calculation
  * 4. Admin cancels event (if needed)
  *
  * Uses OnchainTestKit for wallet interactions with shared Anvil instance.
+ * Supports both MetaMask and Coinbase Wallet via E2E_WALLET env var.
  * Each test deploys its own contract for isolation.
  */
 
@@ -24,7 +25,7 @@ import {
   waitForAppLoad,
   waitForTransactionSuccess,
   waitForTransactionComplete,
-  switchMetaMaskAccount,
+  switchWalletAccount,
   connectWallet,
 } from './fixtures';
 import { runDiagnostics } from './diagnostics';
@@ -39,8 +40,8 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should show admin controls when connected as owner', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should show admin controls when connected as owner', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test (deployer = admin/owner)
@@ -57,12 +58,12 @@ test.describe('Admin Attendance Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet as deployer (account 0 = admin/owner)
-    await connectWallet(page, metamask, { accountIndex: 0 });
+    await connectWallet(page, wallet, { accountIndex: 0 });
     await waitForAppLoad(page);
 
     // Reload to ensure admin account is recognized
     await page.reload();
-    await connectWallet(page, metamask, { accountIndex: 0 });
+    await connectWallet(page, wallet, { accountIndex: 0 });
     await waitForAppLoad(page);
 
     // Admin controls should be visible - wait for them to appear
@@ -83,8 +84,8 @@ test.describe('Admin Attendance Flow', () => {
     expect(hasCancelButton || hasPaybackButton || hasGrantAdminButton).toBeTruthy();
   });
 
-  test('should allow admin to mark attendance', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should allow admin to mark attendance', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -101,8 +102,8 @@ test.describe('Admin Attendance Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // First register as user (account 1)
-    await switchMetaMaskAccount(metamask, 1);
-    await connectWallet(page, metamask);
+    await switchWalletAccount(wallet, 1);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Register a user (handle max 15 chars after @)
@@ -111,15 +112,15 @@ test.describe('Admin Attendance Flow', () => {
     await twitterInput.fill(handle);
     await page.locator('button:has-text("RSVP")').click();
 
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
     await waitForTransactionComplete(page);
 
     // Switch to admin (account 0 = deployer)
-    await switchMetaMaskAccount(metamask, 0);
+    await switchWalletAccount(wallet, 0);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Look for attendance checkboxes
@@ -136,7 +137,7 @@ test.describe('Admin Attendance Flow', () => {
           const attendButton = page.locator('button:has-text("Attend")');
           if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
             await attendButton.click();
-            await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+            await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
               approvalType: ActionApprovalType.APPROVE,
             });
             await waitForTransactionSuccess(page);
@@ -147,8 +148,8 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should allow admin to trigger payback', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should allow admin to trigger payback', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -165,8 +166,8 @@ test.describe('Admin Attendance Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // First register as user (account 1)
-    await switchMetaMaskAccount(metamask, 1);
-    await connectWallet(page, metamask);
+    await switchWalletAccount(wallet, 1);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Register a participant (handle max 15 chars after @)
@@ -175,15 +176,15 @@ test.describe('Admin Attendance Flow', () => {
     await twitterInput.fill(handle);
     await page.locator('button:has-text("RSVP")').click();
 
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
     await waitForTransactionComplete(page);
 
     // Switch to admin and mark attendance (account 0)
-    await switchMetaMaskAccount(metamask, 0);
+    await switchWalletAccount(wallet, 0);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Mark attendance if there are unchecked participants
@@ -194,7 +195,7 @@ test.describe('Admin Attendance Flow', () => {
       const attendButton = page.locator('button:has-text("Attend")');
       if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
         await attendButton.click();
-        await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
           approvalType: ActionApprovalType.APPROVE,
         });
         await waitForTransactionSuccess(page);
@@ -205,7 +206,7 @@ test.describe('Admin Attendance Flow', () => {
     const paybackButton = page.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
-      await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
         approvalType: ActionApprovalType.APPROVE,
       });
       await waitForTransactionSuccess(page);
@@ -214,8 +215,8 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should allow admin to cancel event', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should allow admin to cancel event', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -232,7 +233,7 @@ test.describe('Admin Attendance Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect as admin (account 0 = deployer)
-    await connectWallet(page, metamask, { accountIndex: 0 });
+    await connectWallet(page, wallet, { accountIndex: 0 });
     await waitForAppLoad(page);
 
     const cancelButton = page.locator('button:has-text("Cancel")');
@@ -245,8 +246,8 @@ test.describe('Admin Attendance Flow', () => {
     }
   });
 
-  test('should load event page for any connected user', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should load event page for any connected user', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -263,7 +264,7 @@ test.describe('Admin Attendance Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet (as the default account)
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Verify event info is displayed
@@ -283,8 +284,8 @@ test.describe('Admin Attendance Flow', () => {
     // the UI shows all actions, but transactions will fail for non-admins.
   });
 
-  test('should update attended count after marking attendance', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should update attended count after marking attendance', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -301,8 +302,8 @@ test.describe('Admin Attendance Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Register as user first (account 1)
-    await switchMetaMaskAccount(metamask, 1);
-    await connectWallet(page, metamask);
+    await switchWalletAccount(wallet, 1);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Register a user (handle max 15 chars after @)
@@ -310,15 +311,15 @@ test.describe('Admin Attendance Flow', () => {
     await twitterInput.fill(`@cnt${String(Date.now()).slice(-6)}`);
     await page.locator('button:has-text("RSVP")').click();
 
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
     await waitForTransactionSuccess(page);
 
     // Switch to admin and mark attendance (account 0)
-    await switchMetaMaskAccount(metamask, 0);
+    await switchWalletAccount(wallet, 0);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     const checkbox = page.locator('input[type="checkbox"]').first();
@@ -328,7 +329,7 @@ test.describe('Admin Attendance Flow', () => {
       const attendButton = page.locator('button:has-text("Attend")');
       if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
         await attendButton.click();
-        await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
           approvalType: ActionApprovalType.APPROVE,
         });
         await waitForTransactionSuccess(page);

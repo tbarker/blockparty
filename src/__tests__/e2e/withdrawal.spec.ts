@@ -1,13 +1,14 @@
 /**
  * Withdrawal Flow E2E Tests (OnchainTestKit)
  *
- * Tests the complete withdrawal flow with real MetaMask:
+ * Tests the complete withdrawal flow with wallet automation:
  * 1. User registers for event
  * 2. Admin marks user as attended
  * 3. Admin triggers payback
  * 4. User withdraws their payout
  *
  * Uses OnchainTestKit for wallet interactions with shared Anvil instance.
+ * Supports both MetaMask and Coinbase Wallet via E2E_WALLET env var.
  * Each test deploys its own contract for isolation.
  */
 
@@ -24,7 +25,7 @@ import {
   waitForAppLoad,
   waitForTransactionSuccess,
   waitForTransactionComplete,
-  switchMetaMaskAccount,
+  switchWalletAccount,
   connectWallet,
   ensurePageReady,
 } from './fixtures';
@@ -40,8 +41,8 @@ test.describe('Withdrawal Flow', () => {
     }
   });
 
-  test('should allow user to withdraw after attendance and payback', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should allow user to withdraw after attendance and payback', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -58,10 +59,10 @@ test.describe('Withdrawal Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Step 1: Register as user (account 1)
-    await switchMetaMaskAccount(metamask, 1);
-    await connectWallet(page, metamask);
+    await switchWalletAccount(wallet, 1);
+    await connectWallet(page, wallet);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
@@ -77,15 +78,15 @@ test.describe('Withdrawal Flow', () => {
     await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
     await rsvpButton.click();
 
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
     await waitForTransactionSuccess(page);
 
     // Step 2: Switch to admin (account 0 = deployer)
-    await switchMetaMaskAccount(metamask, 0);
+    await switchWalletAccount(wallet, 0);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Step 3: Mark attendance
@@ -96,7 +97,7 @@ test.describe('Withdrawal Flow', () => {
       const attendButton = page.locator('button:has-text("Attend")');
       if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
         await attendButton.click();
-        await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
           approvalType: ActionApprovalType.APPROVE,
         });
         await waitForTransactionSuccess(page);
@@ -107,23 +108,23 @@ test.describe('Withdrawal Flow', () => {
     const paybackButton = page.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
-      await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
         approvalType: ActionApprovalType.APPROVE,
       });
       await waitForTransactionSuccess(page);
     }
 
     // Step 5: Switch back to user (account 1) and withdraw
-    await switchMetaMaskAccount(metamask, 1);
+    await switchWalletAccount(wallet, 1);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Step 6: Withdraw
     const withdrawButton = page.locator('button:has-text("Withdraw")');
     if ((await withdrawButton.count()) > 0 && (await withdrawButton.isEnabled())) {
       await withdrawButton.click();
-      await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
         approvalType: ActionApprovalType.APPROVE,
       });
       await waitForTransactionComplete(page);
@@ -132,8 +133,8 @@ test.describe('Withdrawal Flow', () => {
     }
   });
 
-  test('should show withdraw button only after event ends', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should show withdraw button only after event ends', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -150,10 +151,10 @@ test.describe('Withdrawal Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect as user (account 1)
-    await switchMetaMaskAccount(metamask, 1);
-    await connectWallet(page, metamask);
+    await switchWalletAccount(wallet, 1);
+    await connectWallet(page, wallet);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
@@ -168,7 +169,7 @@ test.describe('Withdrawal Flow', () => {
     await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
     await rsvpButton.click();
 
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
     await waitForTransactionSuccess(page);
@@ -184,8 +185,8 @@ test.describe('Withdrawal Flow', () => {
     }
   });
 
-  test('should prevent double withdrawal', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should prevent double withdrawal', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -202,10 +203,10 @@ test.describe('Withdrawal Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Step 1: Register as user (account 1)
-    await switchMetaMaskAccount(metamask, 1);
-    await connectWallet(page, metamask);
+    await switchWalletAccount(wallet, 1);
+    await connectWallet(page, wallet);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
@@ -221,15 +222,15 @@ test.describe('Withdrawal Flow', () => {
     await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
     await rsvpButton.click();
 
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
     await waitForTransactionSuccess(page);
 
     // Step 2: Switch to admin and mark attendance (account 0)
-    await switchMetaMaskAccount(metamask, 0);
+    await switchWalletAccount(wallet, 0);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
@@ -241,7 +242,7 @@ test.describe('Withdrawal Flow', () => {
       const attendButton = page.locator('button:has-text("Attend")');
       if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
         await attendButton.click();
-        await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
           approvalType: ActionApprovalType.APPROVE,
         });
         await waitForTransactionSuccess(page);
@@ -252,23 +253,23 @@ test.describe('Withdrawal Flow', () => {
     const paybackButton = page.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
-      await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
         approvalType: ActionApprovalType.APPROVE,
       });
       await waitForTransactionSuccess(page);
     }
 
     // Step 4: Switch back to user and withdraw (account 1)
-    await switchMetaMaskAccount(metamask, 1);
+    await switchWalletAccount(wallet, 1);
     await page.reload();
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     const withdrawButton = page.locator('button:has-text("Withdraw")');
 
     if ((await withdrawButton.count()) > 0 && (await withdrawButton.isEnabled())) {
       await withdrawButton.click();
-      await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
         approvalType: ActionApprovalType.APPROVE,
       });
       // Wait for withdrawal to complete and button state to update

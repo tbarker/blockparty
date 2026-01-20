@@ -1,16 +1,17 @@
 /**
  * Registration Flow E2E Tests (OnchainTestKit)
  *
- * Tests the complete user registration flow with real MetaMask:
- * 1. Wallet connects via MetaMask
+ * Tests the complete user registration flow with wallet automation:
+ * 1. Wallet connects via MetaMask or Coinbase Wallet
  * 2. Event details are displayed from Anvil
  * 3. User enters Twitter handle
- * 4. User clicks RSVP, MetaMask confirms transaction
+ * 4. User clicks RSVP, wallet confirms transaction
  * 5. Transaction is mined on Anvil
  * 6. UI updates to show registration status
  *
  * Phase 1: Uses createOnchainTest with per-test Anvil instances.
  * Each test gets its own Anvil node via LocalNodeManager.
+ * Supports both MetaMask and Coinbase Wallet via E2E_WALLET env var.
  */
 
 import {
@@ -41,8 +42,8 @@ test.describe('Registration Flow', () => {
     }
   });
 
-  test('should display event details on page load', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should display event details on page load', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract for this test
@@ -59,7 +60,7 @@ test.describe('Registration Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Verify event info section is visible
@@ -72,8 +73,8 @@ test.describe('Registration Flow', () => {
     await expect(page.getByText('Going (spots left)')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show connected account in RainbowKit button', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should show connected account in RainbowKit button', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
@@ -90,7 +91,7 @@ test.describe('Registration Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
 
     // Wait for RainbowKit account button
     const accountButton = page.locator(
@@ -103,8 +104,8 @@ test.describe('Registration Flow', () => {
     expect(buttonText).toMatch(/0x[a-fA-F0-9]/);
   });
 
-  test('should allow user to register for event', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should allow user to register for event', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
@@ -121,7 +122,7 @@ test.describe('Registration Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Enter Twitter handle and RSVP
@@ -130,8 +131,8 @@ test.describe('Registration Flow', () => {
     await expect(rsvpButton).toBeEnabled();
     await rsvpButton.click();
 
-    // Confirm transaction in MetaMask
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    // Confirm transaction in wallet
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
 
@@ -145,8 +146,8 @@ test.describe('Registration Flow', () => {
     await expect(rsvpButton).toBeDisabled();
   });
 
-  test('should update participant count after registration', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should update participant count after registration', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
@@ -163,7 +164,7 @@ test.describe('Registration Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
     // Enter Twitter handle
@@ -178,7 +179,7 @@ test.describe('Registration Flow', () => {
     await rsvpButton.click();
 
     // Confirm transaction
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
 
@@ -190,8 +191,8 @@ test.describe('Registration Flow', () => {
     await expect(page.locator('text=/\\d+\\(\\d+\\)/')).toBeVisible({ timeout: 5000 });
   });
 
-  test('should display participants table with registration data', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should display participants table with registration data', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy isolated contract
@@ -208,7 +209,7 @@ test.describe('Registration Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await dismissRainbowKitPopovers(page);
 
@@ -224,7 +225,7 @@ test.describe('Registration Flow', () => {
     await rsvpButton.click();
 
     // Confirm transaction
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
 

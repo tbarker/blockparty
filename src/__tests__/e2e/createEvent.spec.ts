@@ -1,16 +1,17 @@
 /**
  * Create Event E2E Tests (OnchainTestKit)
  *
- * Tests the complete event creation flow with real MetaMask:
+ * Tests the complete event creation flow with wallet automation:
  * 1. User clicks "+ New Event" button in AppBar
  * 2. Fills in event creation form (including metadata and banner image)
  * 3. Uploads metadata and image to Arweave devnet
- * 4. Submits and confirms MetaMask transaction
+ * 4. Submits and confirms wallet transaction
  * 5. Event is created via ConferenceFactory
  * 6. User can navigate to the newly created event
  * 7. Metadata is fetched from Arweave and displayed
  *
  * Uses OnchainTestKit for wallet interactions with shared Anvil instance.
+ * Supports both MetaMask and Coinbase Wallet via E2E_WALLET env var.
  */
 
 import path from 'path';
@@ -42,8 +43,8 @@ test.describe('Create Event Flow', () => {
     }
   });
 
-  test('should show "+ New Event" button when wallet is connected', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should show "+ New Event" button when wallet is connected', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -57,7 +58,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -66,8 +67,8 @@ test.describe('Create Event Flow', () => {
     await expect(newEventButton).toBeVisible({ timeout: 15000 });
   });
 
-  test('should open New Event dialog when clicking "+ New Event"', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should open New Event dialog when clicking "+ New Event"', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -81,7 +82,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -112,10 +113,10 @@ test.describe('Create Event Flow', () => {
 
   test('should show "Create New Event" button on landing page when no contract', async ({
     page,
-    metamask,
+    wallet,
     node,
   }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -129,7 +130,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
 
     // Wait for React to render the app content
     await page.waitForLoadState('domcontentloaded');
@@ -155,8 +156,8 @@ test.describe('Create Event Flow', () => {
     await expect(createButton).toBeVisible({ timeout: 15000 });
   });
 
-  test('should create event via factory and navigate to it', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should create event via factory and navigate to it', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -170,7 +171,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet (account 0 has ETH from Anvil)
-    await connectWallet(page, metamask, { accountIndex: 0 });
+    await connectWallet(page, wallet, { accountIndex: 0 });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -199,8 +200,8 @@ test.describe('Create Event Flow', () => {
     await expect(createButton).toBeEnabled({ timeout: 5000 });
     await createButton.click();
 
-    // Confirm transaction in MetaMask
-    await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+    // Confirm transaction in wallet
+    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
       approvalType: ActionApprovalType.APPROVE,
     });
 
@@ -245,8 +246,8 @@ test.describe('Create Event Flow', () => {
     await expect(page.locator(`text=${eventName}`).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should validate required fields before submitting', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should validate required fields before submitting', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -260,7 +261,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -287,8 +288,8 @@ test.describe('Create Event Flow', () => {
     await expect(errorAlert).toBeVisible({ timeout: 5000 });
   });
 
-  test('should close dialog when clicking Cancel', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should close dialog when clicking Cancel', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -302,7 +303,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -325,10 +326,10 @@ test.describe('Create Event Flow', () => {
 
   test('should verify Arweave upload is available when filling metadata fields', async ({
     page,
-    metamask,
+    wallet,
     node,
   }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Deploy factory for this test
@@ -342,7 +343,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet
-    await connectWallet(page, metamask);
+    await connectWallet(page, wallet);
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -402,8 +403,8 @@ test.describe('Create Event Flow', () => {
   });
 
   // This test involves image upload + Arweave + contract creation
-  test('should create event via factory and verify on event page', async ({ page, metamask, node }) => {
-    if (!metamask) throw new Error('MetaMask fixture required');
+  test('should create event via factory and verify on event page', async ({ page, wallet, node }) => {
+    if (!wallet) throw new Error('Wallet fixture required');
     const rpcUrl = getAnvilUrl(node);
 
     // Triple the default timeout for Arweave upload + signature operations
@@ -420,7 +421,7 @@ test.describe('Create Event Flow', () => {
     await page.goto('http://localhost:3000/');
 
     // Connect wallet (account 0 has ETH from Anvil)
-    await connectWallet(page, metamask, { accountIndex: 0 });
+    await connectWallet(page, wallet, { accountIndex: 0 });
 
     // Wait for app to fully load
     await waitForPageReady(page);
@@ -544,13 +545,13 @@ test.describe('Create Event Flow', () => {
         break;
       }
 
-      // Try to handle any pending MetaMask action
+      // Try to handle any pending wallet action
       try {
-        await metamask.handleAction(BaseActionType.HANDLE_TRANSACTION, {
+        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
           approvalType: ActionApprovalType.APPROVE,
         });
         signaturesConfirmed++;
-        console.log(`Confirmed MetaMask action ${signaturesConfirmed}`);
+        console.log(`Confirmed wallet action ${signaturesConfirmed}`);
       } catch {
         // No pending action, check if still creating
         const isCreating = await page
@@ -561,7 +562,7 @@ test.describe('Create Event Flow', () => {
           break;
         }
         await page.waitForTimeout(200);
-        console.log('No MetaMask popup found, continuing...');
+        console.log('No wallet popup found, continuing...');
       }
     }
 

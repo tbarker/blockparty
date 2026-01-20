@@ -3,23 +3,27 @@
  *
  * Uses OnchainTestKit's fluent builder pattern with:
  * - Per-test Anvil instances via LocalNodeManager (enables parallelization)
- * - MetaMask wallet automation with custom 12.8.1 compatible network setup
+ * - MetaMask or Coinbase Wallet automation (controlled via E2E_WALLET env var)
  *
  * NOTE: We use .withLocalNode() for per-test Anvil but NOT .withNetwork()
  * because OnchainTestKit's addNetwork has MetaMask 12.8.1 compatibility issues.
  * Network is added via .withCustomSetup() using our custom selectors.
  */
 
-import { configure, MetaMaskSpecificActionType } from '@coinbase/onchaintestkit';
+import { configure } from '@coinbase/onchaintestkit';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Wallet type selection via environment variable
+export type WalletType = 'metamask' | 'coinbase';
+export const WALLET_TYPE: WalletType = (process.env.E2E_WALLET || 'metamask') as WalletType;
 
 // Anvil's default mnemonic - generates the test accounts
 export const SEED_PHRASE =
   process.env.E2E_TEST_SEED_PHRASE ||
   'test test test test test test test test test test test junk';
 
-// Password for the MetaMask wallet
+// Password for wallet setup (MetaMask or Coinbase Wallet)
 export const PASSWORD = 'BlockPartyTest123!';
 
 // Chain ID for local Anvil network
@@ -61,30 +65,48 @@ export function loadE2EState(): E2EState {
  *
  * This configuration:
  * - Creates a per-test Anvil node via LocalNodeManager (enables parallel tests)
- * - Configures MetaMask with seed phrase
- * - Uses custom network setup that's compatible with MetaMask 12.8.1
+ * - Configures MetaMask or Coinbase Wallet based on E2E_WALLET env var
+ * - Uses custom network setup that's compatible with wallet UI variations
  *
  * NOTE: We use .withLocalNode() for per-test Anvil but NOT .withNetwork()
- * because OnchainTestKit's addNetwork has MetaMask 12.8.1 compatibility issues.
- * Network is added in fixtures.ts using custom selectors via addAnvilNetwork().
+ * because OnchainTestKit's addNetwork has wallet compatibility issues.
+ * Network is added in fixtures.ts using custom selectors.
  */
-export const walletConfig = configure()
-  .withLocalNode({
-    chainId: CHAIN_ID,
-    // Dynamic port allocation - each test gets its own Anvil instance
-    // This enables parallel test execution without state conflicts
-    minPort: 8546,
-    maxPort: 9545,
-  })
+
+// Base node configuration shared by both wallets
+const nodeConfig = {
+  chainId: CHAIN_ID,
+  // Dynamic port allocation - each test gets its own Anvil instance
+  // This enables parallel test execution without state conflicts
+  minPort: 8546,
+  maxPort: 9545,
+};
+
+// MetaMask configuration
+const metamaskConfig = configure()
+  .withLocalNode(nodeConfig)
   .withMetaMask()
   .withSeedPhrase({
     seedPhrase: SEED_PHRASE,
     password: PASSWORD,
   })
-  // NOTE: We intentionally skip .withNetwork() here because it uses
-  // OnchainTestKit's addNetwork which has MetaMask 12.8.1 compatibility issues.
-  // Network is added manually in fixtures.ts with compatible selectors.
   .build();
+
+// Coinbase Wallet configuration
+const coinbaseConfig = configure()
+  .withLocalNode(nodeConfig)
+  .withCoinbase()
+  .withSeedPhrase({
+    seedPhrase: SEED_PHRASE,
+    password: PASSWORD,
+  })
+  .build();
+
+// Export the appropriate config based on wallet type
+export const walletConfig = WALLET_TYPE === 'coinbase' ? coinbaseConfig : metamaskConfig;
+
+// Export individual configs for reference
+export { metamaskConfig, coinbaseConfig };
 
 /**
  * Anvil pre-funded accounts (derived from seed phrase)

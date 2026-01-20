@@ -27,6 +27,8 @@
     "test:all": "npm run test && npm run test:ui && npm run test:build",
     "test:full": "npm run test && npm run test:ui && npm run test:integration",
     "test:e2e": "node scripts/prepare-metamask.mjs && xvfb-run npx playwright test --config playwright.onchaintestkit.config.ts",
+    "test:e2e:metamask": "E2E_WALLET=metamask npm run test:e2e",
+    "test:e2e:coinbase": "echo 'NOTE: Coinbase Wallet tests currently not working due to OnchainTestKit/extension version mismatch. See notes/coinbase-wallet-e2e-limitation.md' && node scripts/prepare-coinbase.mjs && E2E_WALLET=coinbase xvfb-run npx playwright test --config playwright.onchaintestkit.config.ts",
     "test:e2e:debug": "node scripts/prepare-metamask.mjs && xvfb-run npx playwright test --config playwright.onchaintestkit.config.ts --debug",
     "start": "webpack serve --mode development --port 3000",
     "dev": "webpack serve --mode development",

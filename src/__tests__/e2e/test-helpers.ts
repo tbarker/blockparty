@@ -59,6 +59,7 @@ export async function setupTestWithContract(
     deposit?: string;
     maxParticipants?: number;
     accountIndex?: number;
+    skipWalletConnect?: boolean;
   }
 ): Promise<{ contractAddress: string; rpcUrl: string }> {
   const rpcUrl = getAnvilUrl(node);
@@ -74,8 +75,10 @@ export async function setupTestWithContract(
   await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
   await page.goto(APP_URL);
 
-  await connectWallet(page, wallet, { accountIndex: options?.accountIndex ?? 0 });
-  await waitForAppLoad(page);
+  if (!options?.skipWalletConnect) {
+    await connectWallet(page, wallet, { accountIndex: options?.accountIndex ?? 0 });
+    await waitForAppLoad(page);
+  }
 
   return { contractAddress, rpcUrl };
 }

@@ -47,15 +47,14 @@ test.describe('Withdrawal Flow', () => {
   test('should allow user to withdraw after attendance and payback', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
 
-    // Deploy contract
+    // Deploy contract without connecting (we need to connect as user, not deployer)
     await setupTestWithContract(page, wallet, node, {
       name: 'Withdrawal Test',
+      skipWalletConnect: true,
     });
 
     // Step 1: Register as user (account 1)
     await switchWalletAccount(wallet, 1);
-    await connectWallet(page, wallet);
-    await page.reload();
     await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);
@@ -85,15 +84,14 @@ test.describe('Withdrawal Flow', () => {
   test('should show withdraw button only after event ends', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
 
-    // Deploy contract
+    // Deploy contract without connecting (we need to connect as user, not deployer)
     await setupTestWithContract(page, wallet, node, {
       name: 'Withdraw Button Visibility Test',
+      skipWalletConnect: true,
     });
 
     // Connect as user (account 1)
     await switchWalletAccount(wallet, 1);
-    await connectWallet(page, wallet);
-    await page.reload();
     await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);
@@ -116,15 +114,14 @@ test.describe('Withdrawal Flow', () => {
   test('should prevent double withdrawal', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
 
-    // Deploy contract
+    // Deploy contract without connecting (we need to connect as user, not deployer)
     await setupTestWithContract(page, wallet, node, {
       name: 'Double Withdrawal Test',
+      skipWalletConnect: true,
     });
 
     // Step 1: Register as user (account 1)
     await switchWalletAccount(wallet, 1);
-    await connectWallet(page, wallet);
-    await page.reload();
     await connectWallet(page, wallet);
     await waitForAppLoad(page);
     await ensurePageReady(page);

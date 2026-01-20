@@ -75,9 +75,10 @@ test.describe('Admin Attendance Flow', () => {
   test('should allow admin to mark attendance', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
 
-    // Deploy contract
+    // Deploy contract without connecting (we need to connect as user first)
     await setupTestWithContract(page, wallet, node, {
       name: 'Mark Attendance Test',
+      skipWalletConnect: true,
     });
 
     // Switch to user account and register
@@ -95,9 +96,10 @@ test.describe('Admin Attendance Flow', () => {
   test('should allow admin to trigger payback', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
 
-    // Deploy contract
+    // Deploy contract without connecting (we need to connect as user first)
     await setupTestWithContract(page, wallet, node, {
       name: 'Trigger Payback Test',
+      skipWalletConnect: true,
     });
 
     // Switch to user account and register
@@ -166,9 +168,10 @@ test.describe('Admin Attendance Flow', () => {
   test('should update attended count after marking attendance', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
 
-    // Deploy contract
+    // Deploy contract without connecting (we need to connect as user first)
     await setupTestWithContract(page, wallet, node, {
       name: 'Attended Count Test',
+      skipWalletConnect: true,
     });
 
     // Switch to user account and register

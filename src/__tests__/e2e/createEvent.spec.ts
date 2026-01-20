@@ -20,18 +20,16 @@ import {
   expect,
   BaseActionType,
   ActionApprovalType,
-  ANVIL_ACCOUNTS,
-  CHAIN_ID,
   getAnvilUrl,
-  deployFactory,
-  injectE2EConfig,
   dismissWelcomeModal,
   waitForAppLoad,
   waitForPageReady,
-  waitForTransactionSuccess,
-  connectWallet,
 } from './fixtures';
 import { runDiagnostics } from './diagnostics';
+import {
+  setupTestWithFactory,
+  confirmTransaction,
+} from './test-helpers';
 
 test.describe('Create Event Flow', () => {
   // Run diagnostics on test failure
@@ -45,20 +43,8 @@ test.describe('Create Event Flow', () => {
 
   test('should show "+ New Event" button when wallet is connected', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config with factory address (no contract needed)
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
+    await setupTestWithFactory(page, wallet, node, { waitForAppLoad: false });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -69,20 +55,8 @@ test.describe('Create Event Flow', () => {
 
   test('should open New Event dialog when clicking "+ New Event"', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
+    await setupTestWithFactory(page, wallet, node, { waitForAppLoad: false });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -117,20 +91,8 @@ test.describe('Create Event Flow', () => {
     node,
   }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config without contract address (factory only)
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
+    await setupTestWithFactory(page, wallet, node, { waitForAppLoad: false });
 
     // Wait for React to render the app content
     await page.waitForLoadState('domcontentloaded');
@@ -158,20 +120,8 @@ test.describe('Create Event Flow', () => {
 
   test('should create event via factory and navigate to it', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config without contract address (factory only)
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet (account 0 has ETH from Anvil)
-    await connectWallet(page, wallet, { accountIndex: 0 });
+    await setupTestWithFactory(page, wallet, node, { accountIndex: 0, waitForAppLoad: false });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -201,9 +151,7 @@ test.describe('Create Event Flow', () => {
     await createButton.click();
 
     // Confirm transaction in wallet
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
+    await confirmTransaction(page, wallet);
 
     // Wait for success state
     const successDialog = page.locator('h2:has-text("Event Created Successfully!")');
@@ -248,20 +196,8 @@ test.describe('Create Event Flow', () => {
 
   test('should validate required fields before submitting', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
+    await setupTestWithFactory(page, wallet, node, { waitForAppLoad: false });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -290,20 +226,8 @@ test.describe('Create Event Flow', () => {
 
   test('should close dialog when clicking Cancel', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
+    await setupTestWithFactory(page, wallet, node, { waitForAppLoad: false });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -330,20 +254,8 @@ test.describe('Create Event Flow', () => {
     node,
   }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
+    await setupTestWithFactory(page, wallet, node, { waitForAppLoad: false });
     await waitForPageReady(page);
     await dismissWelcomeModal(page);
 
@@ -405,23 +317,11 @@ test.describe('Create Event Flow', () => {
   // This test involves image upload + Arweave + contract creation
   test('should create event via factory and verify on event page', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
     // Triple the default timeout for Arweave upload + signature operations
     test.slow();
 
-    // Deploy factory for this test
-    const factoryAddress = await deployFactory({
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
-    });
-
-    // Inject E2E config without contract address (factory only)
-    await injectE2EConfig(page, { factoryAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet (account 0 has ETH from Anvil)
-    await connectWallet(page, wallet, { accountIndex: 0 });
+    await setupTestWithFactory(page, wallet, node, { accountIndex: 0, waitForAppLoad: false });
 
     // Wait for app to fully load
     await waitForPageReady(page);

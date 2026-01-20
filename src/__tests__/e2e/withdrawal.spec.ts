@@ -15,21 +15,24 @@
 import {
   test,
   expect,
-  BaseActionType,
-  ActionApprovalType,
-  ANVIL_ACCOUNTS,
-  CHAIN_ID,
   getAnvilUrl,
-  deployTestEvent,
-  injectE2EConfig,
   waitForAppLoad,
-  waitForTransactionSuccess,
   waitForTransactionComplete,
   switchWalletAccount,
   connectWallet,
   ensurePageReady,
 } from './fixtures';
 import { runDiagnostics } from './diagnostics';
+import {
+  setupTestWithContract,
+  generateTwitterHandle,
+  confirmTransaction,
+  setupAsAdmin,
+  setupAsUser,
+  registerAsUser,
+  markAttendance,
+  triggerPayback,
+} from './test-helpers';
 
 test.describe('Withdrawal Flow', () => {
   // Run diagnostics on test failure
@@ -43,20 +46,11 @@ test.describe('Withdrawal Flow', () => {
 
   test('should allow user to withdraw after attendance and payback', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy contract
+    await setupTestWithContract(page, wallet, node, {
       name: 'Withdrawal Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
 
     // Step 1: Register as user (account 1)
     await switchWalletAccount(wallet, 1);
@@ -66,89 +60,35 @@ test.describe('Withdrawal Flow', () => {
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
-    // Wait for twitter input to be visible and register
-    const handle = `@wdr${String(Date.now()).slice(-6)}`;
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
-    await twitterInput.fill(handle);
+    await registerAsUser(page, wallet, generateTwitterHandle('wdr'));
 
-    // Wait for RSVP button to be enabled before clicking
-    const rsvpButton = page.locator('button:has-text("RSVP")');
-    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
-    await rsvpButton.click();
+    // Step 2: Switch to admin and mark attendance
+    await setupAsAdmin(page, wallet);
+    await markAttendance(page, wallet);
 
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-    await waitForTransactionSuccess(page);
+    // Step 3: Trigger payback
+    await triggerPayback(page, wallet);
 
-    // Step 2: Switch to admin (account 0 = deployer)
-    await switchWalletAccount(wallet, 0);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
+    // Step 4: Switch back to user and withdraw
+    await setupAsUser(page, wallet, 1);
 
-    // Step 3: Mark attendance
-    const attendCheckbox = page.locator('input[type="checkbox"]').first();
-    if ((await attendCheckbox.count()) > 0 && !(await attendCheckbox.isChecked())) {
-      await attendCheckbox.check();
-
-      const attendButton = page.locator('button:has-text("Attend")');
-      if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
-        await attendButton.click();
-        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-          approvalType: ActionApprovalType.APPROVE,
-        });
-        await waitForTransactionSuccess(page);
-      }
-    }
-
-    // Step 4: Trigger payback
-    const paybackButton = page.locator('button:has-text("Payback")');
-    if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
-      await paybackButton.click();
-      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-        approvalType: ActionApprovalType.APPROVE,
-      });
-      await waitForTransactionSuccess(page);
-    }
-
-    // Step 5: Switch back to user (account 1) and withdraw
-    await switchWalletAccount(wallet, 1);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
-
-    // Step 6: Withdraw
+    // Step 5: Withdraw
     const withdrawButton = page.locator('button:has-text("Withdraw")');
     if ((await withdrawButton.count()) > 0 && (await withdrawButton.isEnabled())) {
       await withdrawButton.click();
-      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-        approvalType: ActionApprovalType.APPROVE,
-      });
+      await confirmTransaction(page, wallet);
       await waitForTransactionComplete(page);
-
       await expect(withdrawButton).toBeDisabled({ timeout: 10000 });
     }
   });
 
   test('should show withdraw button only after event ends', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy contract
+    await setupTestWithContract(page, wallet, node, {
       name: 'Withdraw Button Visibility Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
 
     // Connect as user (account 1)
     await switchWalletAccount(wallet, 1);
@@ -158,23 +98,11 @@ test.describe('Withdrawal Flow', () => {
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
-    // Wait for twitter input to be visible and register
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
-    await twitterInput.fill('@wdr_visible');
-
-    // Wait for RSVP button to be enabled before clicking
-    const rsvpButton = page.locator('button:has-text("RSVP")');
-    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
-    await rsvpButton.click();
-
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-    await waitForTransactionSuccess(page);
+    // Register
+    await registerAsUser(page, wallet, '@wdr_visible');
 
     const withdrawButton = page.locator('button:has-text("Withdraw")');
+    const rsvpButton = page.locator('button:has-text("RSVP")');
 
     const isEventEnded = (await withdrawButton.count()) > 0;
 
@@ -187,20 +115,11 @@ test.describe('Withdrawal Flow', () => {
 
   test('should prevent double withdrawal', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy contract
+    await setupTestWithContract(page, wallet, node, {
       name: 'Double Withdrawal Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
 
     // Step 1: Register as user (account 1)
     await switchWalletAccount(wallet, 1);
@@ -210,68 +129,24 @@ test.describe('Withdrawal Flow', () => {
     await waitForAppLoad(page);
     await ensurePageReady(page);
 
-    // Wait for twitter input to be visible and register
-    const handle = `@dbl${String(Date.now()).slice(-6)}`;
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
-    await twitterInput.fill(handle);
+    await registerAsUser(page, wallet, generateTwitterHandle('dbl'));
 
-    // Wait for RSVP button to be enabled before clicking
-    const rsvpButton = page.locator('button:has-text("RSVP")');
-    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
-    await rsvpButton.click();
-
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-    await waitForTransactionSuccess(page);
-
-    // Step 2: Switch to admin and mark attendance (account 0)
-    await switchWalletAccount(wallet, 0);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
+    // Step 2: Switch to admin and mark attendance
+    await setupAsAdmin(page, wallet);
     await ensurePageReady(page);
-
-    // Mark attendance if checkbox available
-    const attendCheckbox = page.locator('input[type="checkbox"]').first();
-    if ((await attendCheckbox.count()) > 0 && !(await attendCheckbox.isChecked())) {
-      await attendCheckbox.check();
-
-      const attendButton = page.locator('button:has-text("Attend")');
-      if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
-        await attendButton.click();
-        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-          approvalType: ActionApprovalType.APPROVE,
-        });
-        await waitForTransactionSuccess(page);
-      }
-    }
+    await markAttendance(page, wallet);
 
     // Step 3: Trigger payback
-    const paybackButton = page.locator('button:has-text("Payback")');
-    if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
-      await paybackButton.click();
-      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-        approvalType: ActionApprovalType.APPROVE,
-      });
-      await waitForTransactionSuccess(page);
-    }
+    await triggerPayback(page, wallet);
 
-    // Step 4: Switch back to user and withdraw (account 1)
-    await switchWalletAccount(wallet, 1);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
+    // Step 4: Switch back to user and withdraw
+    await setupAsUser(page, wallet, 1);
 
     const withdrawButton = page.locator('button:has-text("Withdraw")');
 
     if ((await withdrawButton.count()) > 0 && (await withdrawButton.isEnabled())) {
       await withdrawButton.click();
-      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-        approvalType: ActionApprovalType.APPROVE,
-      });
+      await confirmTransaction(page, wallet);
       // Wait for withdrawal to complete and button state to update
       await waitForTransactionComplete(page);
 

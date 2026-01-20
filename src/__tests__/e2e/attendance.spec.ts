@@ -15,20 +15,20 @@
 import {
   test,
   expect,
-  BaseActionType,
-  ActionApprovalType,
-  ANVIL_ACCOUNTS,
-  CHAIN_ID,
   getAnvilUrl,
-  deployTestEvent,
-  injectE2EConfig,
   waitForAppLoad,
-  waitForTransactionSuccess,
-  waitForTransactionComplete,
   switchWalletAccount,
   connectWallet,
 } from './fixtures';
 import { runDiagnostics } from './diagnostics';
+import {
+  setupTestWithContract,
+  generateTwitterHandle,
+  confirmTransaction,
+  setupAsAdmin,
+  registerAsUser,
+  markAttendance,
+} from './test-helpers';
 
 test.describe('Admin Attendance Flow', () => {
   // Run diagnostics on test failure
@@ -42,24 +42,12 @@ test.describe('Admin Attendance Flow', () => {
 
   test('should show admin controls when connected as owner', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test (deployer = admin/owner)
-    const contractAddress = await deployTestEvent({
+    // Deploy and connect as deployer (account 0 = admin/owner)
+    await setupTestWithContract(page, wallet, node, {
       name: 'Admin Controls Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
+      accountIndex: 0,
     });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet as deployer (account 0 = admin/owner)
-    await connectWallet(page, wallet, { accountIndex: 0 });
-    await waitForAppLoad(page);
 
     // Reload to ensure admin account is recognized
     await page.reload();
@@ -86,155 +74,60 @@ test.describe('Admin Attendance Flow', () => {
 
   test('should allow admin to mark attendance', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy contract
+    await setupTestWithContract(page, wallet, node, {
       name: 'Mark Attendance Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
 
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // First register as user (account 1)
+    // Switch to user account and register
     await switchWalletAccount(wallet, 1);
     await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
-    // Register a user (handle max 15 chars after @)
-    const handle = `@att${String(Date.now()).slice(-6)}`;
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill(handle);
-    await page.locator('button:has-text("RSVP")').click();
+    await registerAsUser(page, wallet, generateTwitterHandle('att'));
 
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-    await waitForTransactionComplete(page);
-
-    // Switch to admin (account 0 = deployer)
-    await switchWalletAccount(wallet, 0);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
-
-    // Look for attendance checkboxes
-    const attendCheckboxes = page.locator('input[type="checkbox"]');
-    const checkboxCount = await attendCheckboxes.count();
-
-    if (checkboxCount > 0) {
-      // Find unchecked checkbox and check it
-      for (let i = 0; i < checkboxCount; i++) {
-        const checkbox = attendCheckboxes.nth(i);
-        if (!(await checkbox.isChecked())) {
-          await checkbox.check();
-
-          const attendButton = page.locator('button:has-text("Attend")');
-          if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
-            await attendButton.click();
-            await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-              approvalType: ActionApprovalType.APPROVE,
-            });
-            await waitForTransactionSuccess(page);
-          }
-          break;
-        }
-      }
-    }
+    // Switch to admin and mark attendance
+    await setupAsAdmin(page, wallet);
+    await markAttendance(page, wallet);
   });
 
   test('should allow admin to trigger payback', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy contract
+    await setupTestWithContract(page, wallet, node, {
       name: 'Trigger Payback Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
 
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // First register as user (account 1)
+    // Switch to user account and register
     await switchWalletAccount(wallet, 1);
     await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
-    // Register a participant (handle max 15 chars after @)
-    const handle = `@pay${String(Date.now()).slice(-6)}`;
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill(handle);
-    await page.locator('button:has-text("RSVP")').click();
+    await registerAsUser(page, wallet, generateTwitterHandle('pay'));
 
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-    await waitForTransactionComplete(page);
+    // Switch to admin, mark attendance, and trigger payback
+    await setupAsAdmin(page, wallet);
+    await markAttendance(page, wallet);
 
-    // Switch to admin and mark attendance (account 0)
-    await switchWalletAccount(wallet, 0);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
-
-    // Mark attendance if there are unchecked participants
-    const attendCheckbox = page.locator('input[type="checkbox"]').first();
-    if ((await attendCheckbox.count()) > 0 && !(await attendCheckbox.isChecked())) {
-      await attendCheckbox.check();
-
-      const attendButton = page.locator('button:has-text("Attend")');
-      if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
-        await attendButton.click();
-        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-          approvalType: ActionApprovalType.APPROVE,
-        });
-        await waitForTransactionSuccess(page);
-      }
-    }
-
-    // Now trigger payback
+    // Trigger payback
     const paybackButton = page.locator('button:has-text("Payback")');
     if ((await paybackButton.count()) > 0 && (await paybackButton.isEnabled())) {
       await paybackButton.click();
-      await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-        approvalType: ActionApprovalType.APPROVE,
-      });
-      await waitForTransactionSuccess(page);
-
+      await confirmTransaction(page, wallet);
       await expect(paybackButton).toBeDisabled({ timeout: 10000 });
     }
   });
 
   test('should allow admin to cancel event', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy and connect as admin (account 0 = deployer)
+    await setupTestWithContract(page, wallet, node, {
       name: 'Cancel Event Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
+      accountIndex: 0,
     });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect as admin (account 0 = deployer)
-    await connectWallet(page, wallet, { accountIndex: 0 });
-    await waitForAppLoad(page);
 
     const cancelButton = page.locator('button:has-text("Cancel")');
     if ((await cancelButton.count()) > 0) {
@@ -248,24 +141,10 @@ test.describe('Admin Attendance Flow', () => {
 
   test('should load event page for any connected user', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    await setupTestWithContract(page, wallet, node, {
       name: 'User View Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet (as the default account)
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
 
     // Verify event info is displayed
     await expect(page.locator('h4:has-text("Event Info")')).toBeVisible();
@@ -286,54 +165,21 @@ test.describe('Admin Attendance Flow', () => {
 
   test('should update attended count after marking attendance', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    // Deploy contract
+    await setupTestWithContract(page, wallet, node, {
       name: 'Attended Count Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
 
-    // Inject E2E config
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Register as user first (account 1)
+    // Switch to user account and register
     await switchWalletAccount(wallet, 1);
     await connectWallet(page, wallet);
     await waitForAppLoad(page);
 
-    // Register a user (handle max 15 chars after @)
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.fill(`@cnt${String(Date.now()).slice(-6)}`);
-    await page.locator('button:has-text("RSVP")').click();
+    await registerAsUser(page, wallet, generateTwitterHandle('cnt'));
 
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-    await waitForTransactionSuccess(page);
-
-    // Switch to admin and mark attendance (account 0)
-    await switchWalletAccount(wallet, 0);
-    await page.reload();
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
-
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    if ((await checkbox.count()) > 0 && !(await checkbox.isChecked())) {
-      await checkbox.check();
-
-      const attendButton = page.locator('button:has-text("Attend")');
-      if ((await attendButton.count()) > 0 && (await attendButton.isEnabled())) {
-        await attendButton.click();
-        await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-          approvalType: ActionApprovalType.APPROVE,
-        });
-        await waitForTransactionSuccess(page);
-      }
-    }
+    // Switch to admin and mark attendance
+    await setupAsAdmin(page, wallet);
+    await markAttendance(page, wallet);
   });
 });

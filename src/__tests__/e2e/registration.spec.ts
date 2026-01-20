@@ -17,20 +17,16 @@
 import {
   test,
   expect,
-  BaseActionType,
-  ActionApprovalType,
-  ANVIL_ACCOUNTS,
-  CHAIN_ID,
   getAnvilUrl,
-  deployTestEvent,
-  injectE2EConfig,
   dismissRainbowKitPopovers,
-  waitForAppLoad,
-  waitForTransactionSuccess,
   waitForTransactionComplete,
-  connectWallet,
 } from './fixtures';
 import { runDiagnostics } from './diagnostics';
+import {
+  setupTestWithContract,
+  confirmTransaction,
+  registerAsUser,
+} from './test-helpers';
 
 test.describe('Registration Flow', () => {
   // Run diagnostics on test failure
@@ -44,24 +40,10 @@ test.describe('Registration Flow', () => {
 
   test('should display event details on page load', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract for this test
-    const contractAddress = await deployTestEvent({
+    await setupTestWithContract(page, wallet, node, {
       name: 'Registration Details Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config and navigate
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
 
     // Verify event info section is visible
     await expect(page.locator('h4:has-text("Event Info")')).toBeVisible();
@@ -75,23 +57,10 @@ test.describe('Registration Flow', () => {
 
   test('should show connected account in RainbowKit button', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract
-    const contractAddress = await deployTestEvent({
+    await setupTestWithContract(page, wallet, node, {
       name: 'Account Dropdown Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config and navigate
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
 
     // Wait for RainbowKit account button
     const accountButton = page.locator(
@@ -106,24 +75,10 @@ test.describe('Registration Flow', () => {
 
   test('should allow user to register for event', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract
-    const contractAddress = await deployTestEvent({
+    await setupTestWithContract(page, wallet, node, {
       name: 'Registration Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config and navigate
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
 
     // Enter Twitter handle and RSVP
     await page.locator('input[placeholder*="twitter"]').fill('@onchain_usr');
@@ -132,12 +87,7 @@ test.describe('Registration Flow', () => {
     await rsvpButton.click();
 
     // Confirm transaction in wallet
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
-
-    // Wait for success notification
-    await waitForTransactionSuccess(page);
+    await confirmTransaction(page, wallet);
 
     // Verify participant appears in the list
     await expect(page.locator('text=@onchain_usr')).toBeVisible({ timeout: 10000 });
@@ -148,40 +98,13 @@ test.describe('Registration Flow', () => {
 
   test('should update participant count after registration', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract
-    const contractAddress = await deployTestEvent({
+    await setupTestWithContract(page, wallet, node, {
       name: 'Participant Count Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
 
-    // Inject E2E config and navigate
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
-
-    // Enter Twitter handle
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
-    await twitterInput.fill('@count_test');
-
-    // Click RSVP button
-    const rsvpButton = page.locator('button:has-text("RSVP")');
-    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
-    await rsvpButton.click();
-
-    // Confirm transaction
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
+    // Register with a unique handle
+    await registerAsUser(page, wallet, '@count_test');
 
     await waitForTransactionComplete(page, {
       expectElement: 'text=/\\d+\\(\\d+\\)/',
@@ -193,41 +116,14 @@ test.describe('Registration Flow', () => {
 
   test('should display participants table with registration data', async ({ page, wallet, node }) => {
     if (!wallet) throw new Error('Wallet fixture required');
-    const rpcUrl = getAnvilUrl(node);
 
-    // Deploy isolated contract
-    const contractAddress = await deployTestEvent({
+    await setupTestWithContract(page, wallet, node, {
       name: 'Participants Table Test',
-      deposit: '0.02',
-      maxParticipants: 20,
-      privateKey: ANVIL_ACCOUNTS.deployer.privateKey,
-      rpcUrl,
     });
-
-    // Inject E2E config and navigate
-    await injectE2EConfig(page, { contractAddress, chainId: CHAIN_ID });
-    await page.goto('http://localhost:3000/');
-
-    // Connect wallet
-    await connectWallet(page, wallet);
-    await waitForAppLoad(page);
     await dismissRainbowKitPopovers(page);
 
-    // Enter Twitter handle
-    const twitterInput = page.locator('input[placeholder*="twitter"]');
-    await twitterInput.waitFor({ state: 'visible', timeout: 30000 });
-    await twitterInput.fill('@table_test');
-
-    // Click RSVP button
-    const rsvpButton = page.locator('button:has-text("RSVP")');
-    await rsvpButton.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(rsvpButton).toBeEnabled({ timeout: 10000 });
-    await rsvpButton.click();
-
-    // Confirm transaction
-    await wallet.handleAction(BaseActionType.HANDLE_TRANSACTION, {
-      approvalType: ActionApprovalType.APPROVE,
-    });
+    // Register with a unique handle
+    await registerAsUser(page, wallet, '@table_test');
 
     await waitForTransactionComplete(page, {
       expectElement: 'table',
